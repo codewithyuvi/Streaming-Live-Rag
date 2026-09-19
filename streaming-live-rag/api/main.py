@@ -24,7 +24,7 @@ reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2")
 gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Import Qdrant classes needed for hybrid search
-from qdrant_client.models import Prefetch, SparseVector, FusionQuery
+from qdrant_client.models import Prefetch, SparseVector, FusionQuery, Fusion
 
 class TurnRequest(BaseModel):
     session_id: str
@@ -64,7 +64,7 @@ def handle_turn(req: TurnRequest):
                     limit=10,
                 )
             ],
-            query=FusionQuery.RRF,
+            query=FusionQuery(fusion=Fusion.RRF),
             limit=5
         )
     except Exception as e:
