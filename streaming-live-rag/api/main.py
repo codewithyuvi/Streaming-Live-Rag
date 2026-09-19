@@ -8,6 +8,8 @@ from telemetry.schema import TelemetryEvent, RetrievalEvent, LatenciesMs, TokenC
 
 from google import genai
 from qdrant_client import QdrantClient
+from fastembed import TextEmbedding, SparseTextEmbedding
+from fastembed.rerank.cross_encoder import TextCrossEncoder
 from dotenv import load_dotenv
 from streaming.stream_simulator import simulate_stream
 from controller.heuristics import is_stable_enough
