@@ -70,3 +70,13 @@ This file tracks the progress of the Streaming Live RAG project for our 4-person
   - Start the FastAPI server via `uvicorn api.main:app --reload`.
   - Send a test curl request to the `/turn` endpoint.
   - After verifying the server works, advance to **Phase 2 (Day 3)**: implementing the sparse BM25 pipeline and RRF fusion.
+
+### [2026-09-19] Gate 2 Cleared - Baseline E2E Functional
+- **Agent:** Antigravity
+- **Actions Taken:** 
+  - The human teammate successfully fired a curl request to the new `/turn` endpoint.
+  - The endpoint correctly performed a dense vector search, injected the context into Gemini 3.8 Flash, and returned a properly cited answer (`[Doc_01 §1]`).
+  - Retrieval latency was ~14ms, and total LLM latency was ~3100ms.
+- **Next Steps for AI/Human Teammates:** 
+  - Review and approve the Implementation Plan for Phase 2.
+  - Implement Sparse BM25 + Dense RRF Fusion and MiniLM Reranking.

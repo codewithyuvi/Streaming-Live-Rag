@@ -39,9 +39,9 @@ def handle_turn(req: TurnRequest):
     # 2. Search Qdrant (Dense only for Phase 1)
     retrieval_start = time.time()
     try:
-        search_result = qdrant_client.search(
+        search_result = qdrant_client.query_points(
             collection_name="dev_corpus_dense",
-            query_vector=query_vec.tolist(),
+            query=query_vec.tolist(),
             limit=3
         )
     except Exception as e:
@@ -52,7 +52,11 @@ def handle_turn(req: TurnRequest):
     # Format chunks for prompt stuffing
     context_blocks = []
     citations = []
-    for hit in search_result:
+    
+    # Extract points from QueryResponse
+    points = search_result.points if hasattr(search_result, "points") else search_result
+    
+    for hit in points:
         chunk_text = hit.payload.get("text", "")
         tag = hit.payload.get("tag", "")
         context_blocks.append(f"[{tag}]\n{chunk_text}")
@@ -77,7 +81,7 @@ def handle_turn(req: TurnRequest):
     llm_start = time.time()
     try:
         response = gemini_client.models.generate_content(
-            model=os.getenv("SYNTHESIS_LLM_MODEL", "gemini-3.8-pro"),
+            model=os.getenv("SYNTHESIS_LLM_MODEL", "gemini-3.8-flash"),
             contents=prompt,
         )
     except Exception as e:
