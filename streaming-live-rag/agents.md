@@ -80,3 +80,14 @@ This file tracks the progress of the Streaming Live RAG project for our 4-person
 - **Next Steps for AI/Human Teammates:** 
   - Review and approve the Implementation Plan for Phase 2.
   - Implement Sparse BM25 + Dense RRF Fusion and MiniLM Reranking.
+
+### [2026-09-19] Phase 2 Complete - Hybrid Search & Reranking Functional
+- **Agent:** Antigravity
+- **Actions Taken:** 
+  - Updated `retrieval/ingest.py` to calculate sparse `Qdrant/bm25` embeddings alongside dense vectors and insert into Qdrant as `named_vectors`.
+  - Upgraded the `/turn` endpoint in `api/main.py` to use `FusionQuery.RRF` combining `dense` and `sparse` queries.
+  - Added a `MiniLM-L-6-v2` cross-encoder step to re-score and sort the top-5 candidate blocks, reducing them to the top-3 before injection into the prompt.
+  - Validated E2E with another curl query. Answer correctly verified.
+  - Latency impact: ~36ms added for the local ONNX reranking step.
+- **Next Steps for AI/Human Teammates:** 
+  - Proceed to Phase 3: implementing multi-turn state accumulation.

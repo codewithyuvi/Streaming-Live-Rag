@@ -115,13 +115,20 @@ def handle_turn(req: TurnRequest):
     
     # 4. LLM Call
     llm_start = time.time()
-    try:
-        response = gemini_client.models.generate_content(
-            model=os.getenv("SYNTHESIS_LLM_MODEL", "gemini-3.8-flash"),
-            contents=prompt,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini Generation Error: {str(e)}")
+    max_retries = 3
+    response = None
+    for attempt in range(max_retries):
+        try:
+            response = gemini_client.models.generate_content(
+                model=os.getenv("SYNTHESIS_LLM_MODEL", "gemini-3.8-flash"),
+                contents=prompt,
+            )
+            break
+        except Exception as e:
+            if "503" in str(e) and attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # Wait 1s, then 2s before retrying
+                continue
+            raise HTTPException(status_code=500, detail=f"Gemini Generation Error: {str(e)}")
         
     ttft = (time.time() - llm_start) * 1000
     answer_text = response.text
