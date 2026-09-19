@@ -4,13 +4,14 @@ from pydantic import BaseModel
 import time
 
 # Use exact relative imports to map correctly
-from telemetry.schema import TelemetryEvent, RetrievalEvent, LatenciesMs, TokenCost
+from telemetry.schema import TelemetryEvent, RetrievalEvent, LatenciesMs, TokenCost, ControllerDecision
 
 from google import genai
 from qdrant_client import QdrantClient
-from fastembed import TextEmbedding, SparseTextEmbedding
-from fastembed.rerank.cross_encoder import TextCrossEncoder
 from dotenv import load_dotenv
+from streaming.stream_simulator import simulate_stream
+from controller.heuristics import is_stable_enough
+from controller.decide import decide_retrieval
 
 load_dotenv()
 
@@ -39,9 +40,40 @@ class TurnResponse(BaseModel):
 def handle_turn(req: TurnRequest):
     start_time = time.time()
     
-    # 1. Embed query
-    query_dense = list(embedding_model.embed([req.utterance]))[0]
-    query_sparse_obj = list(sparse_embedding_model.embed([req.utterance]))[0]
+    # Simulate streaming
+    chunks = list(simulate_stream(req.utterance, words_per_chunk=2, ms_per_chunk=300))
+    
+    final_query = req.utterance
+    controller_decision_log = None
+    
+    for chunk in chunks:
+        # 1. Heuristics filter
+        if not is_stable_enough(chunk.partial_text):
+            continue
+            
+        # 2. LLM Controller
+        decision_dict = decide_retrieval(chunk.partial_text)
+        
+        controller_decision_log = ControllerDecision(
+            trigger=decision_dict["trigger"],
+            timestamp_s=chunk.t_offset_s,
+            reason=decision_dict.get("reason", "")
+        )
+        
+        if decision_dict["trigger"] == "retrieve_now":
+            final_query = chunk.partial_text
+            break
+        elif decision_dict["trigger"] == "no_retrieval_needed":
+            # Fast-path for greetings etc.
+            # For this Phase, we'll just break and still execute the rest to see what happens, or skip Qdrant.
+            final_query = chunk.partial_text
+            break
+            
+    # If no decision forced an early break, final_query defaults to the full req.utterance
+    
+    # 3. Embed final query
+    query_dense = list(embedding_model.embed([final_query]))[0]
+    query_sparse_obj = list(sparse_embedding_model.embed([final_query]))[0]
     query_sparse = SparseVector(
         indices=query_sparse_obj.indices.tolist(),
         values=query_sparse_obj.values.tolist()
@@ -140,14 +172,15 @@ def handle_turn(req: TurnRequest):
     telemetry = TelemetryEvent(
         session_id=req.session_id,
         turn_id=req.turn_id,
+        controller_decision=controller_decision_log,
         retrieval_events=[
             RetrievalEvent(
                 timestamp_s=round(end_time, 2),
-                query=req.utterance,
-                trigger="baseline_turn"
+                query=final_query,
+                trigger=controller_decision_log.trigger if controller_decision_log else "baseline_turn"
             )
         ],
-        sub_queries=[req.utterance],
+        sub_queries=[final_query],
         answer=answer_text,
         citations=citations,
         latencies_ms=LatenciesMs(
