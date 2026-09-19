@@ -1,8 +1,8 @@
 import os
 import glob
-from fastembed import TextEmbedding
+from fastembed import TextEmbedding, SparseTextEmbedding
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, SparseVectorParams, SparseVector
 
 def parse_corpus(corpus_dir: str):
     """
@@ -52,9 +52,16 @@ def ingest():
     print("Loading embedding model (BAAI/bge-small-en-v1.5)...")
     embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
     
+    # Initialize FastEmbed for sparse vectors
+    print("Loading sparse embedding model (Qdrant/bm25)...")
+    sparse_embedding_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+    
     texts = [c["text"] for c in chunks]
     print("Generating dense embeddings...")
     embeddings = list(embedding_model.embed(texts))
+    
+    print("Generating sparse embeddings...")
+    sparse_embeddings = list(sparse_embedding_model.embed(texts))
 
     # Initialize Qdrant Client
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
@@ -69,7 +76,12 @@ def ingest():
         
     client.create_collection(
         collection_name=collection_name,
-        vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+        vectors_config={
+            "dense": VectorParams(size=384, distance=Distance.COSINE)
+        },
+        sparse_vectors_config={
+            "sparse": SparseVectorParams()
+        }
     )
     
     print("Upserting vectors to Qdrant...")
@@ -78,7 +90,13 @@ def ingest():
         points.append(
             PointStruct(
                 id=i,
-                vector=embeddings[i].tolist(),
+                vector={
+                    "dense": embeddings[i].tolist(),
+                    "sparse": SparseVector(
+                        indices=sparse_embeddings[i].indices.tolist(),
+                        values=sparse_embeddings[i].values.tolist()
+                    )
+                },
                 payload={
                     "doc_id": chunk["doc_id"],
                     "section": chunk["section"],
