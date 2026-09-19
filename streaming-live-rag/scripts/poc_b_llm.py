@@ -18,7 +18,7 @@ def run_groq_test(prompt: str):
         return
         
     client = Groq(api_key=api_key)
-    model = os.getenv("FAST_LLM_MODEL", "llama3-8b-8192")
+    model = os.getenv("FAST_LLM_MODEL", "groq/compound-mini")
     
     start_time = time.time()
     try:
