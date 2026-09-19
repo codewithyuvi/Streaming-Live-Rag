@@ -7,7 +7,7 @@ This file tracks the progress of the Streaming Live RAG project for our 4-person
 
 ## Project Context
 - **Hackathon:** Samsung PRISM GenAI Hackathon 2026-27 (Theme 4 - Streaming Live RAG)
-- **Architecture:** FastAPI, asyncio, Qdrant (dense + sparse BM25), FastEmbed (BGE dense + MiniLM reranker), Gemini (LLM). No heavy frameworks like LangChain/LangGraph.
+- **Architecture:** FastAPI, asyncio, Qdrant (dense + sparse BM25), FastEmbed (BGE dense + MiniLM reranker), Dual-Provider LLM (Groq for low-latency controller, Gemini for high-quality synthesis). No heavy frameworks.
 - **Goal:** Build an incremental chunk-driven retrieval system with a controller deciding Wait/Retrieve/Suppress, multi-intent decomposition, and grounded synthesis.
 - **Deadline:** Submission by 25 Sep 2026, 11:59 PM IST.
 
@@ -37,12 +37,16 @@ This file tracks the progress of the Streaming Live RAG project for our 4-person
 - **Next Steps for AI/Human Teammates:** 
   - The tasks from the previous phase still apply (setting `.env`, running POCs), but now specifically utilizing the Gemini API.
 
-### [2026-09-19] POC Tests Executed
+### [2026-09-19] Switched to Dual-Provider Architecture
 - **Agent:** Antigravity
 - **Actions Taken:** 
-  - Ran `docker compose up -d` to start the Qdrant database.
-  - Executed `scripts/poc_a_qdrant.py` — successfully connected to Qdrant and created the required collection.
-  - Executed `scripts/poc_b_llm.py` — confirmed that `gemini-1.5-flash` was deprecated via the SDK, and automatically updated all configurations to use `gemini-3.8-flash`. 
-  - Logged test latency results (~3500ms TTFT) and JSON parsing success in `docs/POC_RESULTS.md`. Note: We experienced some `503 High Demand` errors, so we will need exponential backoff logic for the final benchmark runs.
+  - After analyzing latency logs, determined Gemini (5s-16s) is too slow for the Phase 3 Streaming Controller, which needs to run multiple times per second.
+  - Implemented a "Dual-Provider Architecture" as recommended by the guide's ADRs.
+  - Groq will handle fast controller/decomposition tasks. Gemini will handle final synthesis.
+  - Updated `pyproject.toml` to include both `groq` and `google-genai`.
+  - Re-wrote `.env.example` to require both `GROQ_API_KEY` and `GEMINI_API_KEY`.
+  - Re-wrote `scripts/poc_b_llm.py` to test both APIs side-by-side.
+  - Updated `docs/adr/ADR-4_LLM_Provider.md` to document this critical architectural decision.
 - **Next Steps for AI/Human Teammates:** 
-  - We have fully passed **Gate 1**! We are now ready to begin **Phase 1 (Day 2)** tasks: building the `api/main.py` FastApi endpoint, `retrieval/ingest.py`, and writing the 15 baseline queries.
+  - Provide a `GROQ_API_KEY` alongside the `GEMINI_API_KEY` in `.env`.
+  - Re-run `scripts/poc_b_llm.py` to verify the sub-400ms latency of Groq against the reasoning capabilities of Gemini.

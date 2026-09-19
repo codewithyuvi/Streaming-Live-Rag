@@ -2,51 +2,72 @@ import os
 import time
 from dotenv import load_dotenv
 
-# Run `pip install google-genai` before executing this script
 try:
+    from groq import Groq
     from google import genai
 except ImportError:
-    print("Please install the Gemini SDK: pip install google-genai")
+    print("Please install the dependencies: pip install groq google-genai")
     exit(1)
 
 load_dotenv()
 
-def main():
+def run_groq_test(prompt: str):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key or api_key == "your_groq_api_key_here":
+        print("[Groq Error] GROQ_API_KEY missing in .env")
+        return
+        
+    client = Groq(api_key=api_key)
+    model = os.getenv("FAST_LLM_MODEL", "llama3-8b-8192")
+    
+    start_time = time.time()
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150
+        )
+        total_time = (time.time() - start_time) * 1000
+        print(f"[Groq - Fast Controller Task]")
+        print(f"Response: {response.choices[0].message.content.strip()}")
+        print(f"Latency: {total_time:.2f} ms\n")
+    except Exception as e:
+        print(f"[Groq Error]: {e}\n")
+
+def run_gemini_test(prompt: str):
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "your_gemini_api_key_here":
-        print("Please set GEMINI_API_KEY in .env")
+        print("[Gemini Error] GEMINI_API_KEY missing in .env")
         return
         
     client = genai.Client(api_key=api_key)
-    model = os.getenv("FAST_LLM_MODEL", "gemini-3.8-flash")
+    # Using flash here for the POC, but the app will use pro for synthesis
+    model = "gemini-3.8-flash" 
     
-    prompts = [
-        "What is the venue capacity for Pune?",
-        "Extract intent from: 'I need to cancel my flight to'",
-        "Should we retrieve for: 'Hello there'",
-        "Decompose into sub-queries: 'What is the refund policy and who approves travel?'",
-        "Generate a JSON response indicating { 'retrieve': true }."
-    ]
+    start_time = time.time()
+    try:
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+        )
+        total_time = (time.time() - start_time) * 1000
+        print(f"[Gemini - Synthesis Task]")
+        print(f"Response: {response.text.strip()}")
+        print(f"Latency: {total_time:.2f} ms\n")
+    except Exception as e:
+        print(f"[Gemini Error]: {e}\n")
+
+def main():
+    print("--- Running Dual-Provider LLM POC ---\n")
     
-    print(f"Running LLM POC against Gemini using model: {model}")
-    for i, p in enumerate(prompts):
-        print(f"\n--- Prompt {i+1} ---")
-        start_time = time.time()
-        
-        try:
-            response = client.models.generate_content(
-                model=model,
-                contents=p,
-            )
-            
-            total_time = (time.time() - start_time) * 1000
-            content = response.text
-            
-            print(f"Response: {content.strip()}")
-            print(f"Total Latency: {total_time:.2f} ms")
-            
-        except Exception as e:
-            print(f"Error: {e}")
+    fast_prompt_1 = "Should we retrieve external documents for: 'Hello there'? Reply strictly with YES or NO."
+    fast_prompt_2 = "Generate a JSON response indicating { 'retrieve': true }."
+    
+    synthesis_prompt = "Synthesize an answer using this document: [Doc_01 §1] Pune capacity is 30. User Query: What is the capacity?"
+    
+    run_groq_test(fast_prompt_1)
+    run_groq_test(fast_prompt_2)
+    run_gemini_test(synthesis_prompt)
 
 if __name__ == "__main__":
     main()
