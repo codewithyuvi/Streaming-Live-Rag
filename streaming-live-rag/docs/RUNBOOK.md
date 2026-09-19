@@ -31,7 +31,7 @@ python scripts/poc_b_llm.py
 
 ---
 
-## Phase 1 & 2: Baseline Hybrid Retrieval (Current Phase)
+## Phase 1 & 2: Baseline Hybrid Retrieval
 This phase implements the FastAPI server, Dense+Sparse embeddings, and MiniLM cross-encoder reranking.
 
 **Step 1: Ingest the Corpus**
@@ -56,11 +56,28 @@ curl -X POST http://127.0.0.1:8000/turn \
 
 ---
 
-## Phase 3: Multi-Turn State (Upcoming)
-*(Commands will be added here once Phase 3 is completed)*
+## Phase 3: Streaming Controller & Early Retrieval (Current Phase)
+This phase introduces the simulated streaming interface and the LLM-based trigger controller.
 
-## Phase 4: Async Decomposition (Upcoming)
+**Test the Streaming Controller:**
+With the API running (`uvicorn api.main:app --reload`), send a long sentence. The controller will simulate streaming and intercept the query the moment it's stable.
+```bash
+curl -X POST http://127.0.0.1:8000/turn \
+-H "Content-Type: application/json" \
+-d '{"session_id": "test_04", "turn_id": 1, "utterance": "I was wondering, what is the maximum capacity of the Pune venue because I have a lot of guests?"}'
+```
+*(Check the telemetry JSON response. `retrieval_events` should show it triggering early, chopping off the trailing words).*
+
+**Benchmark the Controller (Gate 2):**
+To measure the Early Retrieval Rate (G2) and False-Trigger Rate:
+```bash
+PYTHONPATH=. venv/bin/python eval/bench_controller.py
+```
+
+---
+
+## Phase 4: Multi-Intent Decomposition (Upcoming)
 *(Commands will be added here once Phase 4 is completed)*
 
-## Phase 5: Streaming & Interruption (Upcoming)
+## Phase 5: Session-Aware Synthesis & Refinement (Upcoming)
 *(Commands will be added here once Phase 5 is completed)*
