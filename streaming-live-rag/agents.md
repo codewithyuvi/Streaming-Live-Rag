@@ -58,3 +58,15 @@ This file tracks the progress of the Streaming Live RAG project for our 4-person
   - Re-ran `poc_b_llm.py`. Groq successfully handled the Controller tasks with **~580ms latency**, validating the Dual-Provider architecture choice. Gemini hit a `429 RESOURCE_EXHAUSTED` rate limit due to earlier testing spikes, confirming we must use Groq for the heavy controller load.
 - **Next Steps for AI/Human Teammates:** 
   - We have passed **Gate 1**. Begin **Phase 1 (Day 2)** tasks: building the `api/main.py` FastAPI endpoint, `retrieval/ingest.py`, and the baseline queries.
+
+### [2026-09-19] Phase 1 Foundation Complete
+- **Agent:** Antigravity
+- **Actions Taken:** 
+  - Created `retrieval/ingest.py` to parse `data/dev_corpus/`, extract `Doc_ID §Section` tags, embed the text via `fastembed`, and push to Qdrant collection `dev_corpus_dense`.
+  - Built the `api/main.py` FastAPI skeleton featuring the `/turn` endpoint with baseline dense retrieval, naive prompt stuffing, and Gemini LLM synthesis. Integrated the Pydantic `TelemetryEvent` model for latency tracking.
+  - Authored `eval/labeled_set.yaml` containing 15 baseline queries (covering simple, complex, chit-chat, and negative routing scenarios).
+- **Next Steps for AI/Human Teammates:** 
+  - Execute `venv/bin/python retrieval/ingest.py` to push the corpus into Qdrant.
+  - Start the FastAPI server via `uvicorn api.main:app --reload`.
+  - Send a test curl request to the `/turn` endpoint.
+  - After verifying the server works, advance to **Phase 2 (Day 3)**: implementing the sparse BM25 pipeline and RRF fusion.
