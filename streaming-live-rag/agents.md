@@ -92,3 +92,32 @@ This file tracks the progress of the Streaming Live RAG project for our 4-person
 - **Next Steps for AI/Human Teammates:** 
   - Proceed to Phase 3: implementing multi-turn state accumulation.
 Phase 3 (Streaming Controller) completed and Gate 2 cleared.
+
+### [2026-09-19] Phase 4 Complete - Multi-Intent Decomposition & Parallel Retrieval
+- **Agent:** Antigravity
+- **Actions Taken:** 
+  - Created `controller/decompose.py` — Groq-based multi-intent decomposer. Uses structured JSON output to split compound utterances into orthogonal sub-queries. Hard-capped at 4 sub-queries. Returns single-element list for simple queries to avoid over-fragmentation.
+  - Created `retrieval/merge.py` — Result merger and deduplicator. Merges parallel retrieval results by Qdrant point ID, keeping the highest rerank score. Tags each chunk with provenance (which sub-queries it was relevant to).
+  - Rewrote `api/main.py` to async — Endpoint now uses `asyncio.gather` to fire parallel hybrid retrieval for each sub-query. Single-intent fast path avoids async overhead. Multi-intent synthesis prompt instructs Gemini to answer each sub-question separately with per-intent citations.
+  - Added 16 compound-utterance eval cases to `eval/labeled_set.yaml` (q16–q31) — covers 2-intent, 3-intent, conversational style, single-intent controls, and edge cases.
+  - Implemented `eval/gates/g3_multi_intent.py` — Gate 5 evaluation script measuring G3 score (±1 tolerance) and over-fragmentation rate.
+- **Next Steps for AI/Human Teammates:** 
+  - Run `python eval/gates/g3_multi_intent.py` to verify G3 ≥ 70%.
+  - Test multi-intent queries via curl to `/turn` endpoint.
+  - Proceed to **Phase 5 (Day 6)**: Session-Aware Synthesis, Grounding & Refinement.
+
+### [2026-09-19] Phase 5 Complete - Session-Aware Synthesis, Grounding & Refinement
+- **Agent:** Antigravity
+- **Actions Taken:** 
+  - Created `session/store.py` — Ephemeral in-memory session store keyed by `session_id`. Tracks turn history (utterance, answer, citations, sub_queries, refinement_type), answer versioning, and conversation history formatting. No cross-session leakage.
+  - Created `controller/refinement.py` — Groq-based refinement classifier. Classifies each turn as `NEW_TOPIC`, `LATE_DETAIL`, or `PRESENTATION_ONLY` based on conversation history and previous answer. LATE_DETAIL triggers selective answer refinement. PRESENTATION_ONLY skips all retrieval/synthesis.
+  - Created `retrieval/grounding.py` — Deterministic grounding validator (G4). Regex-based extraction of `[Doc_XX §Y]` citation tags, cross-checked against available context. Detects fabricated IDs, uncertainty expression, and computes grounding score. Zero LLM cost.
+  - Updated `telemetry/schema.py` — Added `refinement_type`, `grounding_score`, `grounding_report`, `decompose`, `refinement`, and `grounding` latency fields.
+  - Rewrote `api/main.py` — Full Phase 5 integration: session lookup → refinement classification → (PRESENTATION_ONLY fast-path OR full pipeline) → session-aware synthesis prompt with grounding rules → post-synthesis grounding validation → session state update. LATE_DETAIL prompts instruct Gemini to refine rather than restart.
+  - Added 22 eval cases to `eval/labeled_set.yaml` (q32–q53): 11 late-detail/refinement scenarios and 11 presentation-only cases.
+  - Created `eval/gates/g4_grounding.py` — **G4 PASSED: 100% (10/10)**. All valid citations accepted, all fabricated IDs caught, uncertainty detection working.
+  - Created `eval/gates/g5_session_refinement.py` — Gate 5 evaluation for refinement classifier accuracy.
+- **Next Steps for AI/Human Teammates:** 
+  - Run `$env:PYTHONIOENCODING="utf-8"; python eval/gates/g5_session_refinement.py` to verify G5 (requires Groq API key).
+  - Test multi-turn session via sequential curl requests with same `session_id`.
+  - Proceed to **Phase 6 (Day 7)**: Demo UI, Observability & Full Gate Run.
