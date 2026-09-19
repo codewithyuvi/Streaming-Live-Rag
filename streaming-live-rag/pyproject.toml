@@ -1,0 +1,23 @@
+[project]
+name = "streaming-live-rag"
+version = "0.1.0"
+description = "Samsung PRISM GenAI Hackathon 2026-27 - Theme 4 - Streaming Live RAG"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pydantic>=2.0.0",
+    "qdrant-client[fastembed]>=1.9.0",
+    "fastembed>=0.3.0",
+    "python-dotenv>=1.0.0",
+    "google-genai>=0.3.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

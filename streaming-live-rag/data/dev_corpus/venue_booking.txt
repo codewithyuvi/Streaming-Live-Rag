@@ -1,0 +1,5 @@
+Doc_01 §1
+The maximum capacity of the Pune workshop venue is 30 attendees. No standing room is permitted.
+
+Doc_01 §2
+The cancellation policy for workshop venues in Pune requires at least 48 hours notice for a full refund. Cancellations within 48 hours incur a 50% penalty.
