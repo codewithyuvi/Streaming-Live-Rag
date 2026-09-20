@@ -5,7 +5,7 @@
 ## POC A — Qdrant Hybrid Round-Trip
 **Goal:** Verify Qdrant boot, collection creation with dense and sparse vectors, ingestion of toy chunks, and one query combining `prefetch(dense) + prefetch(sparse)` with RRF fusion.
 
-- **Status:** Done (Docker booted successfully, collection `poc_collection` initialized)
+- **Status:** Infra verified; search/latency not yet measured (Docker booted successfully, collection `poc_collection` initialized)
 - **End-to-End Latency:** *Search step pending implementation in Phase 1*
 - **Observations:** Qdrant container boots clean on the `docker compose up -d` command. The Python script connects instantly and successfully configures the `dense` and `sparse` configurations using the SDK.
 

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "llama-3.1-8b-instant")
+FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "groq/compound-mini")
 
 def decide_retrieval(partial_utterance: str) -> dict:
     """

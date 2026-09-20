@@ -7,7 +7,7 @@ queries:
     utterance: "What is the maximum capacity of the Pune workshop venue?"
     expected_doc: "Doc_01"
   - id: q02
-    utterance: "Who needs to approve domestic flights?"
+    utterance: "Who needs to approve international flights?"
     expected_doc: "Doc_02"
   - id: q03
     utterance: "Is standing room permitted in Pune?"
@@ -37,7 +37,7 @@ queries:
     utterance: "What is the capacity of the Mumbai venue?" # Not in corpus
     expected_doc: null
   - id: q10
-    utterance: "Can I book a flight without VP approval if it's domestic?"
+    utterance: "Can I book a flight without VP approval if it's international?"
     expected_doc: "Doc_02"
     
   # Streaming / Incremental simulation
@@ -58,3 +58,37 @@ queries:
   - id: q15
     utterance: "Does the travel policy mention anything about train travel?"
     expected_doc: "Doc_02"
+  
+  # Single Simple Question Controls (Added for Phase 3/4)
+  - id: q16
+    utterance: "What is the cancellation policy for Pune?"
+    expected_doc: "Doc_01"
+  - id: q17
+    utterance: "Who handles the projector setup?"
+    expected_doc: "Doc_01"
+  - id: q18
+    utterance: "Are international flights allowed in economy?"
+    expected_doc: "Doc_02"
+  - id: q19
+    utterance: "What is the hotel allowance?"
+    expected_doc: "Doc_02"
+  - id: q20
+    utterance: "Where is the Pune venue located?"
+    expected_doc: null # not in corpus
+    
+  # Presentation-only / Conversational (Should NOT trigger retrieval)
+  - id: q21
+    utterance: "Let me pull up my slides."
+    expected_doc: null
+  - id: q22
+    utterance: "Can everyone see my screen ok?"
+    expected_doc: null
+  - id: q23
+    utterance: "Moving on to the next topic."
+    expected_doc: null
+  - id: q24
+    utterance: "Thanks for joining the call today."
+    expected_doc: null
+  - id: q25
+    utterance: "I'll take questions at the end."
+    expected_doc: null
