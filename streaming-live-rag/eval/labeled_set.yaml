@@ -92,3 +92,221 @@ queries:
   - id: q25
     utterance: "I'll take questions at the end."
     expected_doc: null
+
+  # ─── Phase 4: Compound / Multi-Intent Cases (q16 – q31) ─────────────
+
+  # Cross-document compound queries (2 intents)
+  - id: q16
+    utterance: "What is the cancellation policy for venues and what are the rules for late flight bookings?"
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 2
+
+  - id: q17
+    utterance: "Tell me about standing room in the Pune venue and whether VP sign-off is needed for emergencies."
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 2
+
+  - id: q18
+    utterance: "How many people can fit in the workshop and how many days before do I need to book flights?"
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 2
+
+  - id: q19
+    utterance: "I need to know the refund rules for venue cancellation and also the travel reimbursement approval process."
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 2
+
+  - id: q20
+    utterance: "Is there a penalty for late venue cancellation, and can I get a late-booking exception for my flight?"
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 2
+
+  # Three-intent compound queries
+  - id: q21
+    utterance: "What is the venue capacity, what is the cancellation penalty, and who approves international travel?"
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 3
+
+  - id: q22
+    utterance: "I need three things: the Pune venue limit, the 48-hour cancellation rule details, and the flight advance booking requirement."
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 3
+
+  # Naturally embedded multi-intent (conversational style)
+  - id: q23
+    utterance: "I'm planning a workshop trip to Pune. Can you tell me how many people the venue holds and also what approvals I need for the flight?"
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 2
+
+  - id: q24
+    utterance: "My manager asked me to check two things — the cancellation terms for the venue and whether we need Director or VP approval for international travel."
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 2
+
+  - id: q25
+    utterance: "Before I book everything, I want to confirm the maximum attendees for Pune, the cancellation penalty percentage, and the advance booking days for flights."
+    expected_doc: "Doc_01, Doc_02"
+    expected_intents: 3
+
+  # Single-intent controls (should NOT be over-fragmented)
+  - id: q26
+    utterance: "What is the cancellation policy?"
+    expected_doc: "Doc_01"
+    expected_intents: 1
+
+  - id: q27
+    utterance: "How far in advance do I need to book international flights?"
+    expected_doc: "Doc_02"
+    expected_intents: 1
+
+  - id: q28
+    utterance: "Tell me everything about the Pune workshop venue."
+    expected_doc: "Doc_01"
+    expected_intents: 1
+
+  # Compound with one unanswerable sub-intent
+  - id: q29
+    utterance: "What is the Pune venue capacity and what is the parking situation there?"
+    expected_doc: "Doc_01"
+    expected_intents: 2
+
+  - id: q30
+    utterance: "Can you explain the travel reimbursement process and also the meal allowance policy?"
+    expected_doc: "Doc_02"
+    expected_intents: 2
+
+  # Edge case: conjunction that is NOT multi-intent
+  - id: q31
+    utterance: "What are the conditions and penalties for late venue cancellation?"
+    expected_doc: "Doc_01"
+    expected_intents: 1
+
+  # ─── Phase 5: Late-Detail / Refinement Cases (q32 – q42) ──────────────
+  # These test the refinement classifier. They simulate multi-turn conversations
+  # where a prior turn provides context.
+
+  # Late-detail: adds constraint to previous venue query
+  - id: q32
+    utterance: "What is the capacity of the Pune venue?"
+    expected_doc: "Doc_01"
+    refinement_type: "NEW_TOPIC"
+    prior_utterance: null
+
+  - id: q33
+    utterance: "And what about the cancellation penalty?"
+    expected_doc: "Doc_01"
+    refinement_type: "LATE_DETAIL"
+    prior_utterance: "What is the capacity of the Pune venue?"
+
+  - id: q34
+    utterance: "Actually, I meant if we cancel within 24 hours"
+    expected_doc: "Doc_01"
+    refinement_type: "LATE_DETAIL"
+    prior_utterance: "What is the cancellation policy?"
+
+  - id: q35
+    utterance: "Wait, the trip was international, not domestic"
+    expected_doc: "Doc_02"
+    refinement_type: "LATE_DETAIL"
+    prior_utterance: "Who approves domestic flights?"
+
+  - id: q36
+    utterance: "What if there are more than 30 people?"
+    expected_doc: "Doc_01"
+    refinement_type: "LATE_DETAIL"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
+
+  - id: q37
+    utterance: "Does that apply to VP-level approvals too?"
+    expected_doc: "Doc_02"
+    refinement_type: "LATE_DETAIL"
+    prior_utterance: "What approvals are needed for international travel?"
+
+  - id: q38
+    utterance: "And what if it's a client emergency?"
+    expected_doc: "Doc_02"
+    refinement_type: "LATE_DETAIL"
+    prior_utterance: "How far in advance do I need to book flights?"
+
+  # New topic after a prior conversation (not a refinement)
+  - id: q39
+    utterance: "Now tell me about the travel reimbursement process."
+    expected_doc: "Doc_02"
+    refinement_type: "NEW_TOPIC"
+    prior_utterance: "What is the capacity of the Pune venue?"
+
+  - id: q40
+    utterance: "Switching gears — what's the venue cancellation policy?"
+    expected_doc: "Doc_01"
+    refinement_type: "NEW_TOPIC"
+    prior_utterance: "Who approves international flights?"
+
+  - id: q41
+    utterance: "Can I also ask about hotel booking deadlines?"
+    expected_doc: "Doc_02"
+    refinement_type: "NEW_TOPIC"
+    prior_utterance: "What is the cancellation penalty for venues?"
+
+  - id: q42
+    utterance: "One more thing — is standing room allowed?"
+    expected_doc: "Doc_01"
+    refinement_type: "LATE_DETAIL"
+    prior_utterance: "How many people fit in the Pune venue?"
+
+  # ─── Phase 5: Presentation-Only Cases (q43 – q53) ─────────────────────
+  # These should be classified as PRESENTATION_ONLY and trigger NO retrieval.
+
+  - id: q43
+    utterance: "OK, got it."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q44
+    utterance: "Thanks!"
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q45
+    utterance: "Thank you so much."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q46
+    utterance: "Perfect, that's what I needed."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q47
+    utterance: "Understood."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q48
+    utterance: "Great, thanks for the info."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q49
+    utterance: "Hmm, let me think about that."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q50
+    utterance: "I see."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q51
+    utterance: "Awesome!"
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q52
+    utterance: "Alright."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
+
+  - id: q53
+    utterance: "OK OK, moving on."
+    expected_doc: null
+    refinement_type: "PRESENTATION_ONLY"
