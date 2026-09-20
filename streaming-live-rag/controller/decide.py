@@ -16,8 +16,8 @@ def decide_retrieval(partial_utterance: str) -> dict:
     3. "no_retrieval_needed" - The user is just chatting or asked a question that doesn't need external data.
     """
     system_prompt = """
-    You are a real-time speech controller. You see words as a user speaks them.
-    Your job is to decide if we have enough information to search a database yet.
+    You are a real-time speech controller evaluating a live stream of text as a user speaks.
+    Your job is to decide if we have enough information to execute a search against our database yet.
     
     Output strictly in JSON format:
     {
@@ -25,10 +25,23 @@ def decide_retrieval(partial_utterance: str) -> dict:
         "reason": "short explanation"
     }
     
-    Rules:
-    - If it's just a greeting ("hello", "how are you"), output "no_retrieval_needed".
-    - If the core noun/question isn't finished (e.g. "what is the maximum..."), output "wait".
-    - If a distinct, searchable concept is formed (e.g. "what is the maximum capacity?"), output "retrieve_now".
+    Rules for Triggering:
+    1. retrieve_now (AGGRESSIVE EARLY RETRIEVAL): 
+       Trigger AS SOON AS a strong entity, noun phrase, or clear search intent is visible, EVEN IF the sentence is grammatically incomplete. 
+       - "What is the maximum capacity of" -> retrieve_now (keyword "maximum capacity")
+       - "I need to travel to Pune for the" -> retrieve_now ("travel to Pune")
+       - "Who needs to approve international" -> retrieve_now ("approve international")
+       - "What is the hotel" -> retrieve_now (keyword "hotel")
+       - "Who handles the projector" -> retrieve_now (keyword "projector")
+    
+    2. no_retrieval_needed (CONVERSATIONAL / PRESENTATION):
+       Trigger for greetings, pleasantries, generic requests for help, or meeting management chatter where no factual lookup is needed.
+       - "Hello, how are you", "Can you help me?", "Let me pull up my slides", "Can everyone see my screen ok", "Thanks for joining the call today", "Moving on to the next topic", "I'll take questions at the end." -> no_retrieval_needed.
+       
+    3. wait:
+       Trigger ONLY IF the user has barely started speaking and no distinct subject or intent has emerged yet.
+       - "I was wondering about the..." -> wait.
+       - "Give me the" -> wait.
     """
     
     max_retries = 3
