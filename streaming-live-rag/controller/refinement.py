@@ -15,14 +15,19 @@ synthesis is needed.
 """
 
 import os
+import sys
 import json
-from groq import Groq
-from dotenv import load_dotenv
+import re
 
-load_dotenv()
+# Ensure parent directory is on sys.path for llm_config import
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "llama-3.1-8b-instant")
+try:
+    from llm_config import call_fast, FAST_LLM_MODEL
+except ImportError:
+    from ..llm_config import call_fast, FAST_LLM_MODEL
 
 
 def classify_refinement(
@@ -38,6 +43,25 @@ def classify_refinement(
       - "reason": short explanation
       - "constraint": (only for LATE_DETAIL) the new constraint to apply
     """
+    u_lower = current_utterance.strip().lower()
+    
+    # Fast path: If no conversation history, check for greetings/chit-chat vs new question
+    if not conversation_history.strip() and not previous_answer.strip():
+        # Check if it's a greeting/pleasantry
+        greeting_words = {"hello", "hi", "hey", "good morning", "good afternoon", "good evening", "how are you", "thanks", "thank you"}
+        cleaned = re.sub(r"[^\w\s]", "", u_lower)
+        if cleaned in greeting_words or any(cleaned.startswith(g) for g in ["hello", "hi ", "hey "]):
+            return {
+                "type": "PRESENTATION_ONLY",
+                "reason": "Initial greeting / conversational opener",
+                "constraint": ""
+            }
+        # If no history and not a greeting, it must be a NEW_TOPIC
+        return {
+            "type": "NEW_TOPIC",
+            "reason": "First substantive question in conversation",
+            "constraint": ""
+        }
 
     system_prompt = """You are a conversation turn classifier for a retrieval system.
 Given the conversation history and the user's current utterance, classify it into exactly one category.
@@ -50,55 +74,46 @@ Output strictly in JSON format:
 }
 
 Categories:
-1. NEW_TOPIC — The user is asking about something completely unrelated to the prior conversation.
-   Examples: switching from venue questions to travel questions with no connection.
+1. NEW_TOPIC — The user is asking about something completely unrelated to the prior conversation, or a different aspect of a topic requiring new search.
+   Examples: Switching from library opening hours to gym membership policies.
 
-2. LATE_DETAIL — The user is adding a constraint, clarification, or follow-up to their previous question.
-   Examples: "Actually, the trip was international", "What about for groups larger than 20?",
-   "And what's the penalty if I cancel?", "I meant for the Pune venue specifically".
-   The key signal is that the new utterance MODIFIES or EXTENDS the previous topic.
+2. LATE_DETAIL — The user is modifying, constraining, or clarifying their immediate prior question.
+   Examples: "Actually, make that an annual membership", "What about for weekend sessions?", "Does that apply if I join in December?".
+   The key signal is that the new utterance MODIFIES or EXTENDS the specific parameters of the previous query.
 
-3. PRESENTATION_ONLY — The user is not asking for information. This includes:
-   - Acknowledgements ("OK", "thanks", "got it")
+3. PRESENTATION_ONLY — The user is not asking for new corpus search. This includes:
+   - Presentation/format adjustments: reformat, shorten, summarise, bullet points, repeat, say it simpler, translate, change tone.
+   - Acknowledgements ("OK", "thanks", "got it", "understood")
    - Filler ("um", "let me think")
-   - Exact repetitions of what was just said
-   - Social pleasantries mid-conversation ("great", "perfect")
+   - Exact repetitions or social pleasantries ("great", "perfect", "hello")
 
 Rules:
-- If there is NO conversation history, the answer is always NEW_TOPIC.
-- A question about a DIFFERENT aspect of the SAME document/topic is still NEW_TOPIC.
-- Only classify as LATE_DETAIL when the utterance directly modifies/constrains the previous query.
+- If the user asks to reformat, shorten, summarize, or put the prior answer in bullets, ALWAYS classify as PRESENTATION_ONLY.
+- A question about a DIFFERENT aspect of the topic is NEW_TOPIC.
+- Only classify as LATE_DETAIL when the utterance directly modifies/constrains the parameters of the previous query.
 """
 
     user_message = f"""Conversation History:
 {conversation_history if conversation_history else "(No prior turns)"}
 
 Previous Answer:
-{previous_answer[:300] if previous_answer else "(No previous answer)"}
+{previous_answer if previous_answer else "(No previous answer)"}
 
 Current Utterance:
 {current_utterance}"""
 
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = groq_client.chat.completions.create(
-                model=FAST_LLM_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-                max_tokens=200,
-            )
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                import time
-                time.sleep(2 ** attempt)
-                continue
-            return {"type": "NEW_TOPIC", "reason": f"Fallback due to API error: {str(e)}", "constraint": ""}
+    try:
+        response = call_fast(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0,
+            max_tokens=200,
+        )
+    except Exception as e:
+        return {"type": "NEW_TOPIC", "reason": f"Fallback due to API error: {str(e)}", "constraint": "", "degraded": True}
 
     try:
         result = json.loads(response.choices[0].message.content)
@@ -111,4 +126,4 @@ Current Utterance:
             result["reason"] = ""
         return result
     except Exception:
-        return {"type": "NEW_TOPIC", "reason": "Parse fallback", "constraint": ""}
+        return {"type": "NEW_TOPIC", "reason": "Parse fallback", "constraint": "", "degraded": True}

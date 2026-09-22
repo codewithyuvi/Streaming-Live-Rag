@@ -1,20 +1,15 @@
-"""
-Phase 5 — Ephemeral Session Store
+﻿"""
+session/store.py — Ephemeral Session Store with Clean Commit Semantics (C4 / C7 / M1 / Appendix B.3).
 
-In-memory session state keyed by session_id. Each session tracks:
-- Conversation history (turns with queries, answers, citations)
-- Current accumulated context for refinement detection
-- Answer version counter for incremental updates
-
-Design decisions:
-- Pure dict-based in-memory store — no persistence across restarts.
-- Session-bound: memory lives and dies with one conversation session.
-- Thread-safe via a simple dict (FastAPI runs in a single event loop).
-- No cross-session leakage (hard requirement from the hackathon rules).
+Tracks:
+- Complete audit trail of turns
+- Substantive query and answer lineage
+- Incremental citations union on LATE_DETAIL
+- Non-corrupting PRESENTATION_ONLY audit tracking
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 
 @dataclass
@@ -26,25 +21,89 @@ class TurnRecord:
     citations: list[str] = field(default_factory=list)
     sub_queries: list[str] = field(default_factory=list)
     refinement_type: str = "NEW_TOPIC"  # NEW_TOPIC | LATE_DETAIL | PRESENTATION_ONLY
+    effective_query: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "turn_id": self.turn_id,
+            "utterance": self.utterance,
+            "answer": self.answer,
+            "citations": self.citations,
+            "sub_queries": self.sub_queries,
+            "refinement_type": self.refinement_type,
+            "effective_query": self.effective_query,
+        }
 
 
 @dataclass
 class Session:
     """Ephemeral session state for one conversation."""
     session_id: str
-    turns: list[TurnRecord] = field(default_factory=list)
+    turns: list[TurnRecord] = field(default_factory=list)  # full audit trail (every turn, any kind)
+    current_query: str = ""                                # the substantive question being refined
+    current_answer: str = ""                               # last substantive answer -- never overwritten by chit-chat
+    current_citations: list[str] = field(default_factory=list)
     answer_version: int = 0
 
+    def commit(
+        self,
+        kind: str,
+        utterance: str,
+        answer: str,
+        cited_tags: list[str],
+        effective_query: str = "",
+        sub_queries: list[str] | None = None
+    ) -> TurnRecord:
+        """
+        Commits a turn with strict lifecycle semantics:
+        - NEW_TOPIC: Starts new lineage, sets version = 1, replaces current answer and citations.
+        - LATE_DETAIL: Updates answer/query, unions citations, increments version += 1.
+        - PRESENTATION_ONLY: Records turn in audit trail only. Current state and version stay untouched.
+        """
+        turn_id = len(self.turns) + 1
+        record = TurnRecord(
+            turn_id=turn_id,
+            utterance=utterance,
+            answer=answer,
+            citations=list(cited_tags),
+            sub_queries=sub_queries or [],
+            refinement_type=kind,
+            effective_query=effective_query or utterance,
+        )
+        self.turns.append(record)
+
+        if kind == "NEW_TOPIC":
+            self.current_query = effective_query or utterance
+            self.current_answer = answer
+            self.current_citations = list(dict.fromkeys(cited_tags))
+            self.answer_version = 1
+        elif kind == "LATE_DETAIL":
+            self.current_query = effective_query or self.current_query
+            self.current_answer = answer
+            self.current_citations = list(dict.fromkeys(self.current_citations + list(cited_tags)))
+            self.answer_version += 1
+        # PRESENTATION_ONLY: audit trail only. current_* and answer_version stay untouched.
+
+        return record
+
     def add_turn(self, turn: TurnRecord):
-        self.turns.append(turn)
-        self.answer_version += 1
+        """Backwards-compatible wrapper calling commit."""
+        self.commit(
+            kind=turn.refinement_type,
+            utterance=turn.utterance,
+            answer=turn.answer,
+            cited_tags=turn.citations,
+            effective_query=turn.effective_query,
+            sub_queries=turn.sub_queries,
+        )
 
     def get_last_turn(self) -> Optional[TurnRecord]:
+        """Returns the most recent turn record, or None if no turns yet."""
         return self.turns[-1] if self.turns else None
 
     def get_history_context(self, max_turns: int = 5) -> str:
         """
-        Returns a formatted string of recent conversation history
+        Returns a formatted string of recent substantive conversation history
         for injection into the synthesis prompt.
         """
         recent = self.turns[-max_turns:]
@@ -54,7 +113,8 @@ class Session:
         lines = []
         for t in recent:
             lines.append(f"[Turn {t.turn_id}] User: {t.utterance}")
-            lines.append(f"[Turn {t.turn_id}] Assistant: {t.answer[:200]}...")
+            # Do not truncate mid-sentence; include full answer or reasonable paragraph
+            lines.append(f"[Turn {t.turn_id}] Assistant: {t.answer}")
             if t.citations:
                 lines.append(f"[Turn {t.turn_id}] Citations: {', '.join(t.citations)}")
         return "\n".join(lines)
@@ -64,11 +124,11 @@ class Session:
         all_cites = []
         for t in self.turns:
             all_cites.extend(t.citations)
-        return list(set(all_cites))
+        return list(dict.fromkeys(all_cites))
 
 
 # ---------------------------------------------------------------------------
-# Global session store (in-memory, ephemeral)
+# Global ephemeral session store
 # ---------------------------------------------------------------------------
 
 _sessions: dict[str, Session] = {}
@@ -89,3 +149,8 @@ def delete_session(session_id: str) -> bool:
 def list_sessions() -> list[str]:
     """List all active session IDs."""
     return list(_sessions.keys())
+
+
+def reset_store():
+    """Clears all sessions (useful for tests)."""
+    _sessions.clear()

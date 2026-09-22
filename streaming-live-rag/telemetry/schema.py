@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+﻿from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class StreamChunk(BaseModel):
@@ -39,8 +39,11 @@ class TokenCost(BaseModel):
 class TelemetryEvent(BaseModel):
     session_id: str
     turn_id: int
-    controller_decision: Optional[ControllerDecision] = None
+    controller_decisions: List[ControllerDecision] = Field(default_factory=list)
+    controller_decision: Optional[ControllerDecision] = None  # backwards compatibility
     refinement_type: str = "NEW_TOPIC"  # NEW_TOPIC | LATE_DETAIL | PRESENTATION_ONLY
+    retrieval_required: bool = True
+    retrieval_skip_reason: str = ""
     retrieval_events: List[RetrievalEvent] = Field(default_factory=list)
     sub_queries: List[str] = Field(default_factory=list)
     answer: str = ""
@@ -49,5 +52,6 @@ class TelemetryEvent(BaseModel):
     grounding_score: float = 0.0
     grounding_report: Optional[dict] = None
     answer_version: int = 0
+    degraded: bool = False
     latencies_ms: LatenciesMs = Field(default_factory=LatenciesMs)
     token_cost: TokenCost = Field(default_factory=TokenCost)

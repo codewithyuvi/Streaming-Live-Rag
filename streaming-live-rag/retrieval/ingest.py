@@ -1,42 +1,61 @@
-import os
+﻿import os
 import glob
+import logging
 from fastembed import TextEmbedding, SparseTextEmbedding
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, SparseVectorParams, SparseVector
+from qdrant_client.models import Distance, VectorParams, PointStruct, SparseVectorParams, SparseVector, Modifier
+
+logger = logging.getLogger(__name__)
+
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "dev_corpus_dense")
+
 
 def parse_corpus(corpus_dir: str):
     """
     Parses all .txt files in the given directory.
-    Expected format in txt files:
-    Doc_01 §1
-    [Chunk text...]
+    Supports:
+    1. Pre-tagged format:
+       Doc_01 §1
+       [Chunk text...]
+    2. Fallback windowed chunking with synthetic tags if header missing.
     """
     chunks = []
+    txt_files = sorted(glob.glob(os.path.join(corpus_dir, "*.txt")))
     
-    txt_files = glob.glob(os.path.join(corpus_dir, "*.txt"))
-    for file_path in txt_files:
+    for doc_idx, file_path in enumerate(txt_files, start=1):
         with open(file_path, "r", encoding="utf-8") as f:
-            lines = f.read().split("\n\n") # split by paragraphs
+            content = f.read().strip()
+            if not content:
+                continue
             
-            for block in lines:
-                block = block.strip()
-                if not block:
-                    continue
-                
+            blocks = [b.strip() for b in content.split("\n\n") if b.strip()]
+            sec_idx = 1
+            for block in blocks:
                 parts = block.split("\n", 1)
                 if len(parts) == 2 and "§" in parts[0]:
                     tag = parts[0].strip()
                     text = parts[1].strip()
-                    doc_id = tag.split(" ")[0]
-                    section = tag.split(" ")[1]
-                    
-                    chunks.append({
-                        "doc_id": doc_id,
-                        "section": section,
-                        "tag": tag,
-                        "text": text
-                    })
+                    tag_parts = tag.split()
+                    doc_id = tag_parts[0] if tag_parts else f"Doc_{doc_idx:02d}"
+                    section = tag_parts[1].lstrip("§") if len(tag_parts) > 1 else str(sec_idx)
+                else:
+                    # Fallback for untagged text
+                    doc_id = f"Doc_{doc_idx:02d}"
+                    section = str(sec_idx)
+                    tag = f"{doc_id} §{section}"
+                    text = block.strip()
+                    logger.warning(f"Untagged block in {file_path}, assigned synthetic tag {tag}")
+
+                chunks.append({
+                    "doc_id": doc_id,
+                    "section": section,
+                    "tag": tag,
+                    "text": text
+                })
+                sec_idx += 1
+                
     return chunks
+
 
 def ingest():
     corpus_dir = os.path.join(os.path.dirname(__file__), "../data/dev_corpus")
@@ -48,13 +67,17 @@ def ingest():
         print("No chunks found. Exiting.")
         return
 
+    # Calculate average chunk length for BM25 calibration
+    avg_len = sum(len(c["text"].split()) for c in chunks) / max(len(chunks), 1)
+    print(f"Calibrated BM25 avg_len: {avg_len:.2f}")
+
     # Initialize FastEmbed for dense vectors
     print("Loading embedding model (BAAI/bge-small-en-v1.5)...")
     embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
     
-    # Initialize FastEmbed for sparse vectors
+    # Initialize FastEmbed for sparse vectors with IDF and calibrated avg_len
     print("Loading sparse embedding model (Qdrant/bm25)...")
-    sparse_embedding_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+    sparse_embedding_model = SparseTextEmbedding(model_name="Qdrant/bm25", avg_len=avg_len)
     
     texts = [c["text"] for c in chunks]
     print("Generating dense embeddings...")
@@ -67,7 +90,7 @@ def ingest():
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
     client = QdrantClient(url=qdrant_url)
     
-    collection_name = "dev_corpus_dense"
+    collection_name = COLLECTION_NAME
     
     # Idempotent collection creation
     if client.collection_exists(collection_name):
@@ -80,7 +103,7 @@ def ingest():
             "dense": VectorParams(size=384, distance=Distance.COSINE)
         },
         sparse_vectors_config={
-            "sparse": SparseVectorParams()
+            "sparse": SparseVectorParams(modifier=Modifier.IDF)
         }
     )
     
@@ -111,6 +134,7 @@ def ingest():
         points=points
     )
     print("Ingestion complete!")
+
 
 if __name__ == "__main__":
     from dotenv import load_dotenv

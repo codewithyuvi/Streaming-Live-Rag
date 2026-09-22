@@ -1,12 +1,16 @@
 import os
+import sys
 import json
-from groq import Groq
-from dotenv import load_dotenv
 
-load_dotenv()
+# Ensure parent directory is on sys.path for llm_config import
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "groq/compound-mini")
+try:
+    from llm_config import call_fast, FAST_LLM_MODEL
+except ImportError:
+    from ..llm_config import call_fast, FAST_LLM_MODEL
 
 def decide_retrieval(partial_utterance: str) -> dict:
     """
@@ -44,26 +48,18 @@ def decide_retrieval(partial_utterance: str) -> dict:
        - "Give me the" -> wait.
     """
     
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = groq_client.chat.completions.create(
-                model=FAST_LLM_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": partial_utterance}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-                max_tokens=150
-            )
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                import time
-                time.sleep(2 ** attempt)
-                continue
-            return {"trigger": "wait", "reason": f"Fallback due to api error: {str(e)}"}
+    try:
+        response = call_fast(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": partial_utterance}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0,
+            max_tokens=150
+        )
+    except Exception as e:
+        return {"trigger": "wait", "reason": f"Fallback due to api error: {str(e)}", "degraded": True}
     
     try:
         decision = json.loads(response.choices[0].message.content)
@@ -71,4 +67,4 @@ def decide_retrieval(partial_utterance: str) -> dict:
             decision["trigger"] = "wait"
         return decision
     except Exception as e:
-        return {"trigger": "wait", "reason": f"Fallback due to parse error: {str(e)}"}
+        return {"trigger": "wait", "reason": f"Fallback due to parse error: {str(e)}", "degraded": True}

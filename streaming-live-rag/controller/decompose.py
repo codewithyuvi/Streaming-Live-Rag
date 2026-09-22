@@ -12,14 +12,18 @@ Design decisions:
 """
 
 import os
+import sys
 import json
-from groq import Groq
-from dotenv import load_dotenv
 
-load_dotenv()
+# Ensure parent directory is on sys.path for llm_config import
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "llama-3.1-8b-instant")
+try:
+    from llm_config import call_fast, FAST_LLM_MODEL
+except ImportError:
+    from ..llm_config import call_fast, FAST_LLM_MODEL
 
 MAX_SUB_QUERIES = 4
 
@@ -56,33 +60,25 @@ Output strictly in JSON format:
 }}
 
 Examples:
-- "What is the capacity?" → 1 sub-query
-- "What is the capacity and who approves flights?" → 2 sub-queries
-- "Hello, how are you?" → 0 sub-queries (empty list)
-- "I need the cancellation policy, the travel approval process, and the venue capacity" → 3 sub-queries
+- "What are the library opening hours?" → 1 sub-query
+- "What are the library opening hours and how many books can I borrow?" → 2 sub-queries
+- "Hello, how are you today?" → 0 sub-queries (empty list)
+- "I need the gym membership fee, the pool schedule, and the guest parking policy" → 3 sub-queries
 """
 
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = groq_client.chat.completions.create(
-                model=FAST_LLM_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": utterance}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-                max_tokens=300
-            )
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                import time
-                time.sleep(2 ** attempt)
-                continue
-            # Fallback: treat the whole utterance as a single query
-            return [{"sub_query": utterance, "intent": "fallback_single"}]
+    try:
+        response = call_fast(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": utterance}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.0,
+            max_tokens=300
+        )
+    except Exception as e:
+        # Fallback: treat the whole utterance as a single query and mark degraded
+        return [{"sub_query": utterance, "intent": "fallback_single", "degraded": True, "error": str(e)}]
 
     try:
         result = json.loads(response.choices[0].message.content)
@@ -95,16 +91,16 @@ Examples:
         # Enforce hard cap
         sub_queries = sub_queries[:MAX_SUB_QUERIES]
 
-        # Ensure each item has required fields
+        # Ensure each item has required non-empty string fields
         validated = []
         for sq in sub_queries:
-            if isinstance(sq, dict) and "sub_query" in sq:
+            if isinstance(sq, dict) and isinstance(sq.get("sub_query"), str) and sq["sub_query"].strip():
                 validated.append({
-                    "sub_query": sq["sub_query"],
-                    "intent": sq.get("intent", "unknown")
+                    "sub_query": sq["sub_query"].strip(),
+                    "intent": str(sq.get("intent", "sub_intent")).strip()
                 })
 
-        # If decomposer returned nothing but there's real content, use original
+        # If decomposer returned nothing but there's real content (>2 words and not pure greeting), use original
         if not validated and len(utterance.split()) > 2:
             return [{"sub_query": utterance, "intent": "single"}]
 
