@@ -1,9 +1,10 @@
-﻿import os
+import os
 import sys
 import asyncio
 import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 # Ensure project root is on sys.path
@@ -56,6 +57,22 @@ def get_gemini_client():
 
 
 SYNTHESIS_MODEL = os.getenv("SYNTHESIS_LLM_MODEL", "gemini-3.8-flash")
+
+
+@app.get("/health")
+def health_check():
+    """Healthcheck endpoint for Docker container and reproducibility validation (Gate G1)."""
+    return {"status": "ok", "version": "0.1.0"}
+
+
+@app.get("/")
+@app.get("/demo")
+def demo_ui():
+    """Serves the interactive live streaming demo dashboard."""
+    static_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static", "index.html"))
+    if os.path.exists(static_file):
+        return FileResponse(static_file)
+    return {"message": "Streaming Live RAG API is running. Access /turn for API queries."}
 
 
 class TurnRequest(BaseModel):

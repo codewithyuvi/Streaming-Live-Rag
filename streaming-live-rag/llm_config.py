@@ -1,4 +1,4 @@
-﻿"""
+"""
 llm_config.py — Centralized LLM configuration and client handling (C1).
 
 Single source of truth for the fast LLM provider (Groq).
@@ -11,19 +11,24 @@ Single source of truth for the fast LLM provider (Groq).
 import os
 import time
 import random
-from groq import Groq
-from dotenv import load_dotenv
-
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "openai/gpt-oss-20b")
-_client: Groq | None = None
+_client = None
 
 
-def get_groq_client() -> Groq:
+def get_groq_client():
     """Lazily initializes and returns the Groq client."""
     global _client
     if _client is None:
+        try:
+            from groq import Groq
+        except ImportError:
+            raise ImportError("The 'groq' package is not installed. Please run: pip install groq")
         api_key = os.getenv("GROQ_API_KEY", "")
         if not api_key:
             raise ValueError(

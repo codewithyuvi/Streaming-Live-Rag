@@ -1,4 +1,31 @@
-﻿from pydantic import BaseModel, Field
+try:
+    from pydantic import BaseModel, Field
+except ImportError:
+    class BaseModel:
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+        def model_dump(self):
+            def _to_dict(obj):
+                if isinstance(obj, BaseModel):
+                    return {k: _to_dict(v) for k, v in obj.__dict__.items()}
+                elif isinstance(obj, list):
+                    return [_to_dict(x) for x in obj]
+                elif isinstance(obj, dict):
+                    return {k: _to_dict(v) for k, v in obj.items()}
+                return obj
+            return _to_dict(self)
+
+        def model_dump_json(self):
+            import json
+            return json.dumps(self.model_dump(), default=str)
+
+    def Field(default=None, default_factory=None, **kwargs):
+        if default_factory is not None:
+            return default_factory()
+        return default
+
 from typing import List, Optional
 
 class StreamChunk(BaseModel):

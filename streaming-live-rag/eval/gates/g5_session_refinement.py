@@ -11,18 +11,18 @@ Target: 100% of refinement/suppression cases behave correctly.
 
 import os
 import sys
-import yaml
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from controller.refinement import classify_refinement
+from eval.dataset_loader import load_labeled_set
 
 
 def evaluate_g5():
-    yaml_path = os.path.join(os.path.dirname(__file__), "..", "labeled_set.yaml")
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
+    data = load_labeled_set()
     queries = data.get("queries", [])
 
     # Filter to cases that have refinement_type labels
