@@ -135,3 +135,32 @@ Phase 3 (Streaming Controller) completed and Gate 2 cleared.
   - Update default model string in `decompose.py` and `refinement.py` to `groq/compound-mini`.
   - Update `docs/RUNBOOK.md` with Phase 4/5 commands.
   - Advance to **Phase 6: Demo UI, Observability & Full Gate Run**.
+
+### [2026-09-23] Critical Audit Fixes (C1–C7, H1–H8, M4, L2), Phase 6 Delivery, and Full Gate Verification
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - **Audit Implementation & Robustness (C1–C7, H1–H8, M4, L2):**
+    - **C1 & M4:** Created centralized `llm_config.py` with transient-only error retries (429, 500, 502, 503, timeouts), exponential backoff with jitter, deferred client initialization, and loud failure logging on authentication or configuration bugs.
+    - **C2:** Added fast-path early exit in `api/main.py` for `no_retrieval_needed` decisions (chit-chat, greetings), responding immediately with zero database lookups or unnecessary retrieval latency.
+    - **C3:** Implemented two-stage controller in `api/main.py`: provisional retrieval triggered on partial utterance at $t_1$, followed by delta retrieval on the complete utterance at $t_{end}$ without discarding provisional chunks.
+    - **C4:** Implemented presentation-only reformatting via LLM in `api/main.py` (e.g. "format as bullets", "summarize in 3 points"), bypassing vector retrieval and preserving the existing answer version counter ($1 \to 1$).
+    - **C5 & C6:** Deployed 44-line deterministic claim-level grounding validator (`retrieval/grounding.py`, Appendix B.1). Validates bracket variants, checks doc-level and section-level citations against retrieved context, detects fabricated IDs, and executes retry-once-then-abstain semantics on ungrounded claims.
+    - **C7:** Refined late detail session lifecycle in `session/store.py` ($1 \to 1 \to 2 \to 1$ progression) and ensured prior citations are unioned rather than dropped when refining answers.
+    - **H1:** Wrapped all blocking synchronous calls (Groq API, FastEmbed tokenization, Qdrant searches) with `asyncio.to_thread` across `api/main.py` to preserve async event-loop responsiveness.
+    - **H4:** Added stop-word guard to `controller/heuristics.py` to reject dangling prepositions/determiners (`in`, `for`, `the`, `at`, etc.) from triggering premature early retrieval.
+    - **H6:** Fixed BM25 sparse embedding pipeline in `retrieval/ingest.py` and `retrieval/hybrid_search.py` using `Modifier.IDF`, calibrated `avg_len`, and proper `query_embed()`.
+    - **H7:** Updated few-shot examples across `controller/decide.py`, `decompose.py`, and `refinement.py` to be domain-neutral and added explicit fallback error telemetry.
+    - **H8:** Implemented quota merge (`retrieval/merge.py`, Appendix B.2) guaranteeing a minimum of 2 chunks per sub-query, capped at 8 chunks total, preventing sub-intent starvation.
+    - **Repo Hygiene (L2, M6):** Untracked 19 `.pyc` bytecode files, hardened `.gitignore`, deleted 33 empty 0-byte directory stubs in `backend/` and `frontend/`, moved duplicate root PDF to `docs/`.
+  - **Phase 6 Deliverables:**
+    - Authored multi-stage production `Dockerfile` (`python:3.11-slim`) with build-time pre-caching of FastEmbed models (`bge-small`, `bm25`, `ms-marco-MiniLM`).
+    - Configured multi-service `docker-compose.yml` with pinned `qdrant:v1.13.2`, automated one-shot `ingest` container, and `api` service with `/health` checks.
+    - Implemented comprehensive evaluation gate suite (`eval/gates/g1_reproducibility.py` through `g6_telemetry.py`), `eval/report.py`, and master runners (`eval/run_eval.py`, `run_eval.bat`, `run_eval.sh`).
+    - Evaluated full scorecard (`eval/results/scorecard.json`): **G1: 100%**, **G2: 100% early (0% false)**, **G3: 83.3%**, **G4: 100% (0 fabricated)**, **G5: 100%**, **G6: 100%**.
+    - Built interactive, production-ready Demo Dashboard (`static/index.html` and `scripts/start_ui.bat`) supporting 6 one-click evaluation scenarios, streaming speech simulator, live controller telemetry visualizer, and local simulation fallback.
+    - Synced all documentation: `README.md`, `RUNBOOK.md`, `BENCHMARK_REPORT.md`, `ARCHITECTURE_BRIEF.md`, `CHECKLIST.md`, and `ADR-4_LLM_Provider.md`.
+- **Next Steps for AI/Human Teammates:**
+  - Verify all gates locally using `run_eval.bat` or `python eval/run_eval.py`.
+  - Record the ≤ 5 minute demo video using the interactive UI (`scripts/start_ui.bat`).
+  - Create release tag `PRISM_GENAI_HACKATHON_Y2026` on final commit.
+

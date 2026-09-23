@@ -1,83 +1,202 @@
 # Streaming Live RAG: Project Runbook
 
-This document explains how to run the project scripts and servers for each phase of development.
+This runbook provides complete operational instructions for running, testing, evaluating, and demonstrating the Streaming Live RAG system across all completed phases (Phase 0 through Phase 6).
 
-## Prerequisites
-Before running anything, ensure your environment is set up:
+---
+
+## 1. Prerequisites & Environment Setup
+
+### 1.1 Dual API Key Configuration
+The system uses a **Dual-Provider Architecture**:
+- **Groq (`GROQ_API_KEY`)**: Powering the ultra-low latency Streaming Controller, Multi-Intent Decomposer, and Session Refinement classifier (~200–400ms).
+- **Gemini (`GEMINI_API_KEY`)**: Powering final Session-Aware Synthesis and Citation Grounding.
+
+Copy `.env.example` to `.env` and fill in your API keys:
 ```bash
-# 1. Start Qdrant in the background
-docker compose up -d
+cp .env.example .env
+```
+Ensure `.env` contains:
+```env
+GROQ_API_KEY=gsk_your_groq_api_key_here
+GEMINI_API_KEY=AIzaSy_your_gemini_api_key_here
+FAST_LLM_MODEL=openai/gpt-oss-20b        # or groq/compound-mini / llama-3.1-8b-instant
+SYNTHESIS_LLM_MODEL=gemini-3.8-flash     # or gemini-2.5-flash
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+```
 
-# 2. Activate the virtual environment
+### 1.2 Execution Modes
+
+#### Option A: Docker Compose (Single-Command Production Run)
+Requirements: Docker & Docker Compose.
+```bash
+# Build and start Qdrant, run auto-ingest, and start FastAPI
+docker compose up --build -d
+
+# Verify services are healthy
+docker compose ps
+curl http://127.0.0.1:8000/health
+```
+
+#### Option B: Local Python Environment (Recommended for Development & Grading)
+Requirements: Python 3.11+.
+```bash
+# Create and activate virtual environment
+python -m venv venv
+# Windows:
+.\venv\Scripts\activate
+# Linux/macOS:
 source venv/bin/activate
 
-# 3. Ensure your `.env` file has the Gemini API Key
+# Install dependencies
+pip install -r requirements.txt
 ```
 
 ---
 
-## Phase 0: Proof of Concepts (Gate 1)
-These scripts were used to validate the underlying database and LLM infrastructure.
+## 2. Phase-by-Phase Execution Guide
 
-**Run Qdrant POC:**
+### Phase 0: Infrastructure & POC Validation (Gate 1)
+Validate connectivity to Qdrant vector database and dual LLM providers:
 ```bash
+# Test Qdrant connectivity and vector operations
 python scripts/poc_a_qdrant.py
-```
 
-**Run Dual-Provider LLM POC:**
-```bash
+# Test Groq vs Gemini dual-provider latency and connectivity
 python scripts/poc_b_llm.py
 ```
 
 ---
 
-## Phase 1 & 2: Baseline Hybrid Retrieval
-This phase implements the FastAPI server, Dense+Sparse embeddings, and MiniLM cross-encoder reranking.
+### Phase 1 & 2: Ingestion & Hybrid Search Pipeline
+Ingest corpus documents with both Dense (BGE-Small) and Sparse (BM25 with `Modifier.IDF`) embeddings, then start the FastAPI service:
 
-**Step 1: Ingest the Corpus**
-You must run the ingester to read the raw `.txt` files in `data/dev_corpus`, generate BGE dense embeddings and BM25 sparse embeddings, and push them to Qdrant.
 ```bash
+# Step 1: Ingest the corpus into Qdrant
 python retrieval/ingest.py
+
+# Step 2: Start the FastAPI pipeline server
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-**Step 2: Start the FastAPI Server**
-Start the main application server. It will hot-reload automatically if you edit `api/main.py`.
-```bash
-uvicorn api.main:app --reload
-```
-
-**Step 3: Test the Endpoint**
-In a separate terminal, test the API using a `curl` request:
+**Verify turn endpoint:**
 ```bash
 curl -X POST http://127.0.0.1:8000/turn \
--H "Content-Type: application/json" \
--d '{"session_id": "test_03", "turn_id": 1, "utterance": "What are the dimensions of the venue?"}'
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "test_01", "turn_id": 1, "utterance": "What are the dimensions and capacity of the Pune venue?"}'
 ```
 
 ---
 
-## Phase 3: Streaming Controller & Early Retrieval (Current Phase)
-This phase introduces the simulated streaming interface and the LLM-based trigger controller.
+### Phase 3: Streaming Controller & Early Retrieval (Gate 2)
+The controller evaluates chunks incrementally. If the query stabilizes before the user stops speaking, it fires provisional retrieval at $t_1$, followed by delta retrieval at $t_{end}$:
 
-**Test the Streaming Controller:**
-With the API running (`uvicorn api.main:app --reload`), send a long sentence. The controller will simulate streaming and intercept the query the moment it's stable.
 ```bash
+# Test early triggering with trailing hesitation
 curl -X POST http://127.0.0.1:8000/turn \
--H "Content-Type: application/json" \
--d '{"session_id": "test_04", "turn_id": 1, "utterance": "I was wondering, what is the maximum capacity of the Pune venue because I have a lot of guests?"}'
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "test_02", "turn_id": 1, "utterance": "I was wondering, what is the maximum capacity of the Pune venue because I have a lot of guests coming?"}'
 ```
-*(Check the telemetry JSON response. `retrieval_events` should show it triggering early, chopping off the trailing words).*
+*Inspect telemetry JSON: `retrieval_events` shows early trigger at $t_1$, and `controller_decisions` logs the trigger rationale.*
 
-**Benchmark the Controller (Gate 2):**
-To measure the Early Retrieval Rate (G2) and False-Trigger Rate:
+**Run Gate 2 benchmark:**
 ```bash
-PYTHONPATH=. venv/bin/python eval/bench_controller.py
+python eval/gates/g2_early_retrieval.py
 ```
 
 ---
 
-## Phase 4: Multi-Intent Decomposition (Upcoming)
-*(Commands will be added here once Phase 4 is completed)*
+### Phase 4: Multi-Intent Decomposition (Gate 3)
+Compound utterances (e.g. asking about both capacity AND cancellation policies) are decomposed into 1..N orthogonal sub-queries, retrieved in parallel, and merged via Quota Merge (min 2 chunks per sub-query, cap 8):
 
-## Phase 5: Session-Aware Synthesis & Refinement (Upcoming)
-*(Commands will be added here once Phase 5 is completed)*
+```bash
+# Test multi-intent query
+curl -X POST http://127.0.0.1:8000/turn \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "test_03", "turn_id": 1, "utterance": "What is the Pune hall capacity, and what is the refund policy if we cancel 10 days before?"}'
+```
+
+**Run Gate 3 benchmark:**
+```bash
+python eval/gates/g3_multi_intent.py
+```
+
+---
+
+### Phase 5: Session Refinement, Grounding & Presentation (Gates 4 & 5)
+Handles multi-turn conversational context with strict answer versioning:
+1. **Turn 1 (NEW_TOPIC):** Fetches context, synthesizes answer ($v=1$).
+2. **Turn 2 (PRESENTATION_ONLY):** "Summarize that in 3 bullet points" — bypasses retrieval, reformats via LLM, keeps version ($v=1$).
+3. **Turn 3 (LATE_DETAIL):** "What if there are 200 guests?" — retrieves delta context, unions prior citations, updates version ($v=2$).
+4. **Claim-Level Grounding:** Enforces deterministic citation verification (`[Doc_ID §Section]`), zero fabricated IDs, and retry-once-then-abstain semantics.
+
+**Run Gate 4 & Gate 5 benchmarks:**
+```bash
+# Gate 4: Grounding and citation validation
+python eval/gates/g4_grounding.py
+
+# Gate 5: Session refinement and continuity
+python eval/gates/g5_session_refinement.py
+```
+
+---
+
+## 3. Phase 6: Interactive Demo UI & Master Evaluation
+
+### 3.1 Interactive Demo Dashboard
+Launch the web interface to visually simulate streaming speech, observe early retrieval triggers, inspect decomposed sub-queries, and verify citation grounding in real time:
+
+- **Windows One-Click Launcher:**
+  ```cmd
+  scripts\start_ui.bat
+  ```
+- **Linux / macOS:**
+  ```bash
+  chmod +x scripts/start_ui.sh
+  ./scripts/start_ui.sh
+  ```
+- **Or via Browser:**
+  Open `static/index.html` directly in any web browser, or navigate to `http://localhost:8000/demo` while the API server is running.
+
+**Preset Scenarios available in Demo UI:**
+1. Simple Question with Early Retrieval (`q01`)
+2. Compound Multi-Intent Query (`q16`)
+3. Chit-Chat / Suppression (Zero DB queries) (`q12`)
+4. Multi-Turn Late Detail Refinement ($1 \to 1 \to 2$) (`q32`)
+5. Presentation-Only Reformatting (No search) (`q44`)
+6. Out-of-Corpus Uncovered Query (`q14`)
+
+---
+
+### 3.2 Master Evaluation Harness (Gates G1–G6)
+Run all 6 evaluation gates with a single command to generate the scorecard:
+
+- **Command Line (Cross-Platform):**
+  ```bash
+  python eval/run_eval.py
+  ```
+- **Windows Batch Script:**
+  ```cmd
+  run_eval.bat
+  ```
+- **Unix Shell Script:**
+  ```bash
+  ./run_eval.sh
+  ```
+
+**Results Output:**
+- Terminal scorecard display with pass/fail thresholds.
+- JSON output: `eval/results/scorecard.json`.
+- Markdown report: `eval/results/scorecard.md`.
+
+---
+
+## 4. Troubleshooting & FAQ
+
+| Issue | Resolution |
+| :--- | :--- |
+| `GROQ_API_KEY is not set` | Ensure `.env` exists in the `streaming-live-rag` directory with a valid Groq API key. |
+| `Qdrant connection refused` | Run `docker compose up -d qdrant` or start local Qdrant on port 6333. |
+| `FastEmbed download timeout` | Pre-download models or run `python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"` |
+| `UI shows API Offline` | The UI includes an automatic fallback to local simulated mode so you can test all 6 scenarios even without a running backend. To connect live, start `uvicorn api.main:app --reload`. |
+
