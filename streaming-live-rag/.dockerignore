@@ -12,3 +12,6 @@ logs/*.jsonl
 docs/Hackathon docs/
 *.pdf
 qdrant_data/
+*.log
+.coverage
+.mypy_cache/

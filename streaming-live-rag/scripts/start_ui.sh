@@ -7,9 +7,5 @@ echo "========================================================"
 echo "  Launching Streaming Live RAG - Demo UI & Pipeline"
 echo "========================================================"
 echo "Starting FastAPI server at http://localhost:8000 ..."
-if which xdg-open > /dev/null; then
-  xdg-open http://localhost:8000/demo &
-elif which open > /dev/null; then
-  open http://localhost:8000/demo &
-fi
+(sleep 2 && (which xdg-open > /dev/null && xdg-open http://localhost:8000/demo || which open > /dev/null && open http://localhost:8000/demo)) &
 python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload

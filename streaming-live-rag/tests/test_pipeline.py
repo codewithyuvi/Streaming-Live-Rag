@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from fastapi.testclient import TestClient
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -95,7 +96,19 @@ def test_fastapi_endpoints():
     assert res.status_code == 200
     assert res.json()["status"] == "ok"
 
+    # Health check with providers
+    res_live = client.get("/health?live=true")
+    assert res_live.status_code == 200
+    assert "providers" in res_live.json()
+
     # Demo UI serves HTML
     demo_res = client.get("/demo")
     assert demo_res.status_code == 200
     assert "text/html" in demo_res.headers.get("content-type", "")
+
+
+def test_rate_limiter():
+    from api.main import _check_rate_limit, _session_request_times
+    _session_request_times["test_rate_session"] = [time.time()] * 60
+    assert _check_rate_limit("test_rate_session") is False
+    assert _check_rate_limit("fresh_session") is True

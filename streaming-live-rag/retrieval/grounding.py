@@ -22,12 +22,17 @@ def canon(doc, sec):
 
 
 def tags_in(text: str) -> list[str]:
-    """Extracts all citation tags from text, handling brackets, commas, semicolons, and parentheses."""
+    """Extracts all citation tags from text, handling brackets, commas, semicolons, parentheses, and unbracketed mentions."""
     out = []
     for inner in BRACKET.findall(text):
         for part in re.split(r"[;,]", inner):
             if (m := ONE_TAG.search(part)):
                 out.append(canon(m.group(1), m.group(2)))
+    # Also extract any unbracketed standalone Doc_XX mentions
+    for m in ONE_TAG.finditer(text):
+        c = canon(m.group(1), m.group(2))
+        if c not in out:
+            out.append(c)
     return out
 
 

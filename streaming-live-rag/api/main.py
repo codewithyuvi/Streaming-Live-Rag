@@ -42,30 +42,58 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import threading
+
 _gemini_client = None
+_gemini_lock = threading.Lock()
 
 
 def get_gemini_client():
     global _gemini_client
     if _gemini_client is None:
-        try:
-            from google import genai
-        except ImportError:
-            raise ImportError("The 'google-genai' package is not installed. Please run: pip install google-genai")
-        api_key = os.getenv("GEMINI_API_KEY", "")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY is not set in environment.")
-        _gemini_client = genai.Client(api_key=api_key)
+        with _gemini_lock:
+            if _gemini_client is None:
+                try:
+                    from google import genai
+                except ImportError:
+                    raise ImportError("The 'google-genai' package is not installed. Please run: pip install google-genai")
+                api_key = os.getenv("GEMINI_API_KEY", "")
+                if not api_key:
+                    raise ValueError("GEMINI_API_KEY is not set in environment.")
+                _gemini_client = genai.Client(api_key=api_key)
     return _gemini_client
 
 
 SYNTHESIS_MODEL = os.getenv("SYNTHESIS_LLM_MODEL", "gemini-2.5-flash")
 
+# In-memory per-session rate limiter (H2)
+_session_request_times: dict[str, list[float]] = {}
+_rate_limit_lock = threading.Lock()
+RATE_LIMIT_PER_MINUTE = 60
+
+
+def _check_rate_limit(session_id: str) -> bool:
+    now = time.time()
+    with _rate_limit_lock:
+        timestamps = _session_request_times.setdefault(session_id, [])
+        valid = [t for t in timestamps if now - t < 60.0]
+        if len(valid) >= RATE_LIMIT_PER_MINUTE:
+            return False
+        valid.append(now)
+        _session_request_times[session_id] = valid
+        return True
+
 
 @app.get("/health")
-def health_check():
+def health_check(live: bool = False):
     """Healthcheck endpoint for Docker container and reproducibility validation (Gate G1)."""
-    return {"status": "ok", "version": "0.1.0"}
+    res = {"status": "ok", "version": "0.1.0"}
+    if live:
+        res["providers"] = {
+            "groq": "configured" if bool(os.getenv("GROQ_API_KEY")) else "missing",
+            "gemini": "configured" if bool(os.getenv("GEMINI_API_KEY")) else "missing",
+        }
+    return res
 
 
 @app.get("/")
@@ -179,6 +207,8 @@ STRICT RULES:
 
 @app.post("/turn", response_model=TurnResponse)
 async def handle_turn(req: TurnRequest):
+    if not _check_rate_limit(req.session_id):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded for this session (max 60 requests/minute).")
     start_time = time.time()
     session = get_or_create_session(req.session_id)
     has_history = len(session.turns) > 0

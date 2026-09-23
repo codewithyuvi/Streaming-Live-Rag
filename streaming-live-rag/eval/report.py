@@ -43,6 +43,28 @@ def print_scorecard(results: dict):
         print("⚠️ OVERALL RESULT: SOME GATES REQUIRE LIVE SERVICE ATTENTION")
     print("=" * 80 + "\n")
 
+    # Write Markdown Scorecard (L6)
+    try:
+        results_dir = os.path.join(os.path.dirname(__file__), "results")
+        os.makedirs(results_dir, exist_ok=True)
+        md_path = os.path.join(results_dir, "scorecard.md")
+        lines = [
+            "# Samsung PRISM GenAI Hackathon 2026–27 — Theme 4",
+            "## Streaming Live RAG Benchmark Scorecard\n",
+            "| Gate | Description | Target | Measured | Status |",
+            "| :--- | :--- | :--- | :--- | :---: |",
+        ]
+        for gid, desc, target, key in gates_meta:
+            gate_res = results.get(key, {})
+            status_icon = "🟢 PASS" if gate_res.get("passed", False) else "🔴 FAIL"
+            measured = gate_res.get("measured", "N/A")
+            lines.append(f"| **{gid}** | {desc} | {target} | {measured} | {status_icon} |")
+        lines.append(f"\n**Overall Result:** {'🏆 ALL 6 COMPETITION GATES PASSED' if all_passed else '⚠️ SOME GATES REQUIRE ATTENTION'}\n")
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+    except Exception:
+        pass
+
 
 if __name__ == "__main__":
     results_path = os.path.join(os.path.dirname(__file__), "results", "scorecard.json")

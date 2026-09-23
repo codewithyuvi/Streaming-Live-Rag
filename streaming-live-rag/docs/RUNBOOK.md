@@ -19,8 +19,8 @@ Ensure `.env` contains:
 ```env
 GROQ_API_KEY=gsk_your_groq_api_key_here
 GEMINI_API_KEY=AIzaSy_your_gemini_api_key_here
-FAST_LLM_MODEL=openai/gpt-oss-20b        # or groq/compound-mini / llama-3.1-8b-instant
-SYNTHESIS_LLM_MODEL=gemini-3.8-flash     # or gemini-2.5-flash
+FAST_LLM_MODEL=llama-3.1-8b-instant        # or qwen/qwen3.8-27b
+SYNTHESIS_LLM_MODEL=gemini-2.5-flash       # or gemini-1.5-flash
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
 ```
