@@ -1,18 +1,17 @@
 import os
 import sys
-import pytest
 from fastapi.testclient import TestClient
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from retrieval.grounding import validate
-from controller.heuristics import is_stable_enough
-from api.main import _same_intent, app
-from session.store import Session, get_or_create_session, reset_store
-from eval.dataset_loader import load_labeled_set
-from retrieval.merge import merge_with_quota
+from retrieval.grounding import validate  # noqa: E402
+from controller.heuristics import is_stable_enough  # noqa: E402
+from api.main import _same_intent, app  # noqa: E402
+from session.store import get_or_create_session, reset_store  # noqa: E402
+from eval.dataset_loader import load_labeled_set  # noqa: E402
+from retrieval.merge import merge_with_quota  # noqa: E402
 
 
 def test_grounding_validator():
@@ -53,18 +52,18 @@ def test_session_lifecycle():
     sess = get_or_create_session("pytest_session")
 
     # Turn 1: NEW_TOPIC -> version 1
-    t1 = sess.commit("NEW_TOPIC", "q1", "ans1", ["Doc_01 §1"])
+    sess.commit("NEW_TOPIC", "q1", "ans1", ["Doc_01 §1"])
     assert sess.answer_version == 1
     assert sess.current_citations == ["Doc_01 §1"]
 
     # Turn 2: LATE_DETAIL -> version 2, union citations
-    t2 = sess.commit("LATE_DETAIL", "q2", "ans2", ["Doc_02 §3"])
+    sess.commit("LATE_DETAIL", "q2", "ans2", ["Doc_02 §3"])
     assert sess.answer_version == 2
     assert "Doc_01 §1" in sess.current_citations
     assert "Doc_02 §3" in sess.current_citations
 
     # Turn 3: PRESENTATION_ONLY -> version unchanged (stays 2)
-    t3 = sess.commit("PRESENTATION_ONLY", "format as bullets", "ans3", ["Doc_01 §1"])
+    sess.commit("PRESENTATION_ONLY", "format as bullets", "ans3", ["Doc_01 §1"])
     assert sess.answer_version == 2
     assert len(sess.turns) == 3
 
