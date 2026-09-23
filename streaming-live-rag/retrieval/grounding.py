@@ -1,121 +1,117 @@
-"""
-Phase 5 — Deterministic Grounding Validator (G4)
-
-Validates that every citation tag in the LLM's answer actually exists
-in the corpus context that was provided. Catches:
-  1. Fabricated Doc IDs (hallucinated references)
-  2. Fabricated Section numbers
-  3. Claims that appear to state facts without any citation
-
-This is a POST-synthesis validator — it runs on the answer text after
-the LLM produces it, and returns a grounding report.
-
-Design: Purely deterministic (regex-based), no LLM call needed.
+﻿"""
+Phase 5 — Claim-Level Deterministic Grounding Validator (ADR-5 / C5 / C6).
+Tested against edge cases T1-T10 in Appendix B.1 of the audit report.
 """
 
 import re
 from dataclasses import dataclass, field
 
+BRACKET = re.compile(r"[\[(]([^\[\]()]*?Doc_\d+[^\[\]()]*?)[\])]")  # [..] or (..) containing a Doc_ mention
+ONE_TAG = re.compile(r"Doc_(\d+)\s*(?:§\s*([\w.]+))?", re.I)         # Doc_01 §1 | Doc_01§1 | Doc_01
+ABSTAIN = re.compile(
+    r"\b(not (?:available|found|mentioned|specified|covered|included)"
+    r"|no (?:relevant )?information (?:is |was )?(?:available|found|provided)"
+    r"|cannot (?:be )?(?:determined|verified)|insufficient (?:information|evidence))\b",
+    re.I
+)
+
+
+def canon(doc, sec):
+    """Canonical spelling for both sides of the comparison."""
+    return f"Doc_{int(doc):02d} §{sec}" if sec else f"Doc_{int(doc):02d}"
+
+
+def tags_in(text: str) -> list[str]:
+    """Extracts all citation tags from text, handling brackets, commas, semicolons, and parentheses."""
+    out = []
+    for inner in BRACKET.findall(text):
+        for part in re.split(r"[;,]", inner):
+            if (m := ONE_TAG.search(part)):
+                out.append(canon(m.group(1), m.group(2)))
+    return out
+
 
 @dataclass
-class GroundingReport:
-    """Result of grounding validation on an LLM answer."""
-    is_grounded: bool
-    cited_tags: list[str] = field(default_factory=list)
-    valid_tags: list[str] = field(default_factory=list)
-    fabricated_tags: list[str] = field(default_factory=list)
-    uncited_claims_detected: bool = False
-    uncertainty_expressed: bool = False
-    score: float = 0.0  # 0.0 to 1.0
+class Report:
+    cited: list[str] = field(default_factory=list)
+    fabricated: list[str] = field(default_factory=list)  # section-less / malformed IDs are fabricated too
+    factual: int = 0
+    supported: int = 0
+    abstained: bool = False
+
+    @property
+    def support(self) -> float:
+        """Claim-level support, which is what G4 measures."""
+        return 1.0 if self.factual == 0 else self.supported / self.factual
+
+    @property
+    def ok(self) -> bool:
+        return not self.fabricated and self.support >= 0.85
+
+    # Backwards-compatible properties
+    @property
+    def is_grounded(self) -> bool:
+        return self.ok
+
+    @property
+    def score(self) -> float:
+        return self.support
+
+    @property
+    def valid_tags(self) -> list[str]:
+        return [t for t in self.cited if t not in self.fabricated]
+
+    @property
+    def fabricated_tags(self) -> list[str]:
+        return self.fabricated
+
+    @property
+    def uncertainty_expressed(self) -> bool:
+        return self.abstained
+
+    @property
+    def uncited_claims_detected(self) -> bool:
+        return self.factual > self.supported
 
     def to_dict(self) -> dict:
         return {
+            "ok": self.ok,
             "is_grounded": self.is_grounded,
-            "cited_tags": self.cited_tags,
+            "cited_tags": self.cited,
             "valid_tags": self.valid_tags,
-            "fabricated_tags": self.fabricated_tags,
+            "fabricated_tags": self.fabricated,
             "uncited_claims_detected": self.uncited_claims_detected,
             "uncertainty_expressed": self.uncertainty_expressed,
-            "score": self.score,
+            "score": round(self.score, 3),
+            "factual": self.factual,
+            "supported": self.supported,
+            "abstained": self.abstained,
         }
 
 
-# Regex to match citation tags like [Doc_01 §1], [Doc_02 §2], etc.
-CITATION_PATTERN = re.compile(r'\[Doc_\d+\s*§\s*\d+\]')
-
-# Uncertainty phrases that indicate the LLM properly flagged gaps
-UNCERTAINTY_PHRASES = [
-    "not available in the provided",
-    "not found in the context",
-    "no information",
-    "not mentioned",
-    "cannot determine",
-    "insufficient information",
-    "not covered",
-    "not specified",
-    "unclear from the context",
-    "uncertain",
-    "does not contain",
-    "not included",
-    "no relevant information",
-]
-
-
-def validate_grounding(
-    answer_text: str,
-    available_tags: list[str],
-) -> GroundingReport:
+def validate(answer: str, retrieved_tags: list[str]) -> Report:
     """
-    Validates that all citation tags in the answer exist in the available corpus tags.
-
-    Args:
-        answer_text: The LLM-generated answer string.
-        available_tags: List of valid tags (e.g. ["Doc_01 §1", "Doc_01 §2"]) that
-                        were in the context provided to the LLM.
-
-    Returns:
-        GroundingReport with detailed validation results.
+    Validates claim-level grounding of an answer against retrieved tags.
     """
-    # Normalize available tags for comparison
-    normalized_available = set()
-    for tag in available_tags:
-        # Strip brackets if present, normalize whitespace
-        clean = tag.strip().strip("[]")
-        clean = re.sub(r'\s+', ' ', clean)
-        normalized_available.add(clean)
+    if not answer:
+        return Report()
 
-    # Extract all citation tags from the answer
-    raw_citations = CITATION_PATTERN.findall(answer_text)
-    cited_tags = []
-    for cite in raw_citations:
-        clean = cite.strip("[]")
-        clean = re.sub(r'\s+', ' ', clean)
-        if clean not in cited_tags:
-            cited_tags.append(clean)
+    avail = {t for x in retrieved_tags for t in tags_in(f"[{x}]")}
+    r = Report(cited=list(dict.fromkeys(tags_in(answer))))
+    r.fabricated = [t for t in r.cited if t not in avail]
 
-    # Classify as valid or fabricated
-    valid_tags = [t for t in cited_tags if t in normalized_available]
-    fabricated_tags = [t for t in cited_tags if t not in normalized_available]
+    for s in re.split(r"(?<=[.!?])\s+", answer.strip()):
+        if len(s.split()) < 4:
+            continue  # fragments / greetings are not claims
+        if ABSTAIN.search(s):
+            r.abstained = True
+            continue  # an abstention sentence is not a claim
+        r.factual += 1
+        r.supported += bool(set(tags_in(s)) & avail)  # sentence carries >=1 retrievable tag
 
-    # Check for uncertainty expression
-    answer_lower = answer_text.lower()
-    uncertainty_expressed = any(phrase in answer_lower for phrase in UNCERTAINTY_PHRASES)
+    return r
 
-    # Compute score
-    if not cited_tags:
-        # No citations at all — only acceptable if uncertainty is expressed
-        score = 1.0 if uncertainty_expressed else 0.0
-    else:
-        score = len(valid_tags) / len(cited_tags) if cited_tags else 0.0
 
-    is_grounded = len(fabricated_tags) == 0 and (len(valid_tags) > 0 or uncertainty_expressed)
-
-    return GroundingReport(
-        is_grounded=is_grounded,
-        cited_tags=cited_tags,
-        valid_tags=valid_tags,
-        fabricated_tags=fabricated_tags,
-        uncited_claims_detected=False,  # Could be enhanced with NLI later
-        uncertainty_expressed=uncertainty_expressed,
-        score=score,
-    )
+def validate_grounding(answer_text: str, available_tags: list[str]) -> Report:
+    """Wrapper alias maintaining backward-compatibility with earlier callers."""
+    return validate(answer_text, available_tags)

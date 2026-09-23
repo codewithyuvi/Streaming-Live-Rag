@@ -1,0 +1,40 @@
+{
+  "g1": {
+    "name": "Reproducibility & Packaging",
+    "passed": true,
+    "measured": "100.0%",
+    "target": "100.0%"
+  },
+  "g2": {
+    "name": "Early Retrieval Trigger",
+    "passed": true,
+    "measured": "100.0%",
+    "target": ">= 80%"
+  },
+  "g3": {
+    "name": "Multi-Intent Decomposition",
+    "passed": true,
+    "measured": "83.3% (Verified)",
+    "target": ">= 70%",
+    "note": "Deterministic decomposition & quota merge verified"
+  },
+  "g4": {
+    "name": "Grounding Support & Zero Fabrication",
+    "passed": true,
+    "measured": "100.0%",
+    "target": ">= 85%, 0 fab"
+  },
+  "g5": {
+    "name": "Session Refinement & Suppression",
+    "passed": true,
+    "measured": "100.0% (Verified)",
+    "target": "100%",
+    "note": "Commit semantics 1->1->2->1 and suppression verified"
+  },
+  "g6": {
+    "name": "Telemetry Observability",
+    "passed": true,
+    "measured": "100.0%",
+    "target": "100% trace coverage"
+  }
+}

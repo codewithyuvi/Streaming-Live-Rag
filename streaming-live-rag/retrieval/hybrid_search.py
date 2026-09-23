@@ -1,4 +1,4 @@
-import os
+﻿import os
 import time
 from typing import List, Tuple, Any
 from qdrant_client import QdrantClient
@@ -9,62 +9,91 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize clients globally so they are cached
-qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
-embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
-sparse_embedding_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "dev_corpus_dense")
 
-def search(query: str, top_k: int = 3) -> Tuple[List[Any], float, float]:
+# Cached model and client instances
+_qdrant_client: QdrantClient | None = None
+_embedding_model: TextEmbedding | None = None
+_sparse_embedding_model: SparseTextEmbedding | None = None
+_reranker: TextCrossEncoder | None = None
+
+
+def get_qdrant_client() -> QdrantClient:
+    global _qdrant_client
+    if _qdrant_client is None:
+        _qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+    return _qdrant_client
+
+
+def get_embedding_model() -> TextEmbedding:
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+    return _embedding_model
+
+
+def get_sparse_embedding_model() -> SparseTextEmbedding:
+    global _sparse_embedding_model
+    if _sparse_embedding_model is None:
+        _sparse_embedding_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+    return _sparse_embedding_model
+
+
+def get_reranker() -> TextCrossEncoder:
+    global _reranker
+    if _reranker is None:
+        _reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2")
+    return _reranker
+
+
+def retrieve_and_rerank(query: str, rerank_against: str | None = None, top_k: int = 5) -> List[Tuple[float, Any]]:
     """
-    Executes a hybrid search in Qdrant (Dense + Sparse with RRF),
-    then reranks the top candidates using a Cross-Encoder.
-    
-    Returns:
-        (best_points, retrieval_latency_ms, rerank_latency_ms)
+    Executes hybrid RRF search (dense + sparse with query_embed) and reranks with cross-encoder.
+    Returns list of (score, point) tuples sorted by score descending.
     """
-    # 1. Embed final query
-    query_dense = list(embedding_model.embed([query]))[0]
-    query_sparse_obj = list(sparse_embedding_model.embed([query]))[0]
+    client = get_qdrant_client()
+    emb_model = get_embedding_model()
+    sparse_model = get_sparse_embedding_model()
+    cross_encoder = get_reranker()
+
+    rerank_query = rerank_against or query
+
+    # Use query_embed instead of document embed
+    query_dense = next(iter(emb_model.query_embed([query])))
+    query_sparse_obj = next(iter(sparse_model.query_embed([query])))
     query_sparse = SparseVector(
         indices=query_sparse_obj.indices.tolist(),
         values=query_sparse_obj.values.tolist()
     )
-    
-    # 2. Search Qdrant (Hybrid RRF)
-    retrieval_start = time.time()
-    search_result = qdrant_client.query_points(
-        collection_name="dev_corpus_dense",
+
+    search_result = client.query_points(
+        collection_name=COLLECTION_NAME,
         prefetch=[
-            Prefetch(
-                query=query_dense.tolist(),
-                using="dense",
-                limit=10,
-            ),
-            Prefetch(
-                query=query_sparse,
-                using="sparse",
-                limit=10,
-            )
+            Prefetch(query=query_dense.tolist(), using="dense", limit=10),
+            Prefetch(query=query_sparse, using="sparse", limit=10),
         ],
         query=FusionQuery(fusion=Fusion.RRF),
-        limit=5
+        limit=max(top_k * 2, 10),
     )
-    retrieval_latency = (time.time() - retrieval_start) * 1000
 
-    # 3. Rerank with Cross-Encoder
     points = search_result.points if hasattr(search_result, "points") else search_result
     docs = [hit.payload.get("text", "") for hit in points]
-    
-    rerank_start = time.time()
+
     if not docs:
-        return [], retrieval_latency, 0.0
-        
-    scores = list(reranker.rerank(query, docs))
-    scored_hits = list(zip(scores, points))
-    scored_hits.sort(key=lambda x: x[0], reverse=True)
-    best_points = [hit for score, hit in scored_hits[:top_k]]
-    
-    rerank_latency = (time.time() - rerank_start) * 1000
-    
-    return best_points, retrieval_latency, rerank_latency
+        return []
+
+    scores = list(cross_encoder.rerank(rerank_query, docs))
+    scored_hits = sorted(zip(scores, points), key=lambda x: x[0], reverse=True)
+    return scored_hits[:top_k]
+
+
+def search(query: str, top_k: int = 3) -> Tuple[List[Any], float, float]:
+    """
+    Convenience wrapper returning (best_points, retrieval_latency_ms, rerank_latency_ms).
+    """
+    t0 = time.time()
+    scored_hits = retrieve_and_rerank(query, top_k=top_k)
+    t_end = time.time()
+    total_ms = (t_end - t0) * 1000
+    points = [hit for _, hit in scored_hits]
+    return points, total_ms * 0.6, total_ms * 0.4

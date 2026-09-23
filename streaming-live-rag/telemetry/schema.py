@@ -1,4 +1,31 @@
-from pydantic import BaseModel, Field
+try:
+    from pydantic import BaseModel, Field
+except ImportError:
+    class BaseModel:
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+        def model_dump(self):
+            def _to_dict(obj):
+                if isinstance(obj, BaseModel):
+                    return {k: _to_dict(v) for k, v in obj.__dict__.items()}
+                elif isinstance(obj, list):
+                    return [_to_dict(x) for x in obj]
+                elif isinstance(obj, dict):
+                    return {k: _to_dict(v) for k, v in obj.items()}
+                return obj
+            return _to_dict(self)
+
+        def model_dump_json(self):
+            import json
+            return json.dumps(self.model_dump(), default=str)
+
+    def Field(default=None, default_factory=None, **kwargs):
+        if default_factory is not None:
+            return default_factory()
+        return default
+
 from typing import List, Optional
 
 class StreamChunk(BaseModel):
@@ -39,8 +66,11 @@ class TokenCost(BaseModel):
 class TelemetryEvent(BaseModel):
     session_id: str
     turn_id: int
-    controller_decision: Optional[ControllerDecision] = None
+    controller_decisions: List[ControllerDecision] = Field(default_factory=list)
+    controller_decision: Optional[ControllerDecision] = None  # backwards compatibility
     refinement_type: str = "NEW_TOPIC"  # NEW_TOPIC | LATE_DETAIL | PRESENTATION_ONLY
+    retrieval_required: bool = True
+    retrieval_skip_reason: str = ""
     retrieval_events: List[RetrievalEvent] = Field(default_factory=list)
     sub_queries: List[str] = Field(default_factory=list)
     answer: str = ""
@@ -49,5 +79,6 @@ class TelemetryEvent(BaseModel):
     grounding_score: float = 0.0
     grounding_report: Optional[dict] = None
     answer_version: int = 0
+    degraded: bool = False
     latencies_ms: LatenciesMs = Field(default_factory=LatenciesMs)
     token_cost: TokenCost = Field(default_factory=TokenCost)

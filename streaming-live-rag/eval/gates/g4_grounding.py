@@ -15,6 +15,9 @@ Target: G4 ≥ 85% citation support, zero fabricated IDs.
 import os
 import sys
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from retrieval.grounding import validate_grounding
@@ -37,6 +40,18 @@ def evaluate_g4():
             "expect_fabricated": 0,
         },
         {
+            "name": "T1: No space before §",
+            "answer": "The venue capacity is 30 [Doc_01§1].",
+            "expect_grounded": True,
+            "expect_fabricated": 0,
+        },
+        {
+            "name": "T2: Combined bracket citation",
+            "answer": "The venue and travel policies apply [Doc_01 §1, Doc_01 §2].",
+            "expect_grounded": True,
+            "expect_fabricated": 0,
+        },
+        {
             "name": "Multiple valid citations",
             "answer": "The capacity is 30 [Doc_01 §1]. Travel requires Director approval [Doc_02 §1].",
             "expect_grounded": True,
@@ -55,7 +70,7 @@ def evaluate_g4():
             "expect_fabricated": 0,
         },
         {
-            "name": "Pure uncertainty (no citations needed)",
+            "name": "T7: Pure uncertainty (no citations needed)",
             "answer": "This information is not available in the provided documents.",
             "expect_grounded": True,
             "expect_fabricated": 0,
@@ -64,6 +79,18 @@ def evaluate_g4():
         {
             "name": "Fabricated Doc ID",
             "answer": "The answer is X [Doc_03 §1].",
+            "expect_grounded": False,
+            "expect_fabricated": 1,
+        },
+        {
+            "name": "T3: Fabricated section-less ID",
+            "answer": "The answer is X [Doc_99].",
+            "expect_grounded": False,
+            "expect_fabricated": 1,
+        },
+        {
+            "name": "T4: Fabricated citation with parentheses",
+            "answer": "The answer is X (Doc_99 §1).",
             "expect_grounded": False,
             "expect_fabricated": 1,
         },

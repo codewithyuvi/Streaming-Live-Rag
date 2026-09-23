@@ -12,19 +12,20 @@ Target: G3 ≥ 70% on compound cases, low over-fragmentation on singles.
 
 import os
 import sys
-import yaml
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from controller.decompose import decompose_query
+from eval.dataset_loader import load_labeled_set
 
 
 def evaluate_g3():
-    yaml_path = os.path.join(os.path.dirname(__file__), "..", "labeled_set.yaml")
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
+    data = load_labeled_set()
     queries = data.get("queries", [])
 
     # Separate compound vs single-intent cases
