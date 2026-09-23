@@ -2,6 +2,7 @@ import os
 import sys
 import asyncio
 import time
+import threading
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -60,8 +61,6 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
-
-import threading
 
 _gemini_client = None
 _gemini_lock = threading.Lock()
