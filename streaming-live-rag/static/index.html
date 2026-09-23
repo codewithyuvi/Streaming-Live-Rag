@@ -203,51 +203,58 @@
       document.getElementById('uncertaintyAlert').style.display = 'none';
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 90000);
         const res = await fetch('/turn', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId, turn_id: turnId, utterance: utterance })
+          body: JSON.stringify({ session_id: sessionId, turn_id: turnId, utterance: utterance }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (!res.ok) {
-          throw new Error('API returned HTTP ' + res.status + ': ' + (await res.text()));
+          let detail = '';
+          try { detail = (await res.json()).detail || await res.text(); } catch { detail = await res.text(); }
+          throw new Error('API returned HTTP ' + res.status + ': ' + String(detail).slice(0, 300));
         }
 
         const data = await res.json();
         const telem = data.telemetry;
+        const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-        // Render Controller Decisions
+        // Render Controller Decisions (all dynamic strings escaped — corpus/LLM text is untrusted)
         if (telem.controller_decisions && telem.controller_decisions.length > 0) {
           document.getElementById('controllerLog').innerHTML = telem.controller_decisions.map(d => {
             const badgeClass = d.trigger === 'retrieve_now' ? 'badge-success' : (d.trigger === 'no_retrieval_needed' ? 'badge-warning' : 'badge-primary');
             return `<div style="margin-bottom:6px;">
-              <span class="badge ${badgeClass}">${d.trigger}</span> at <code>${d.timestamp_s}s</code>: ${d.reason}
+              <span class="badge ${badgeClass}">${esc(d.trigger)}</span> at <code>${esc(d.timestamp_s)}s</code>: ${esc(d.reason)}
             </div>`;
           }).join('');
         } else {
-          document.getElementById('controllerLog').innerHTML = `<span class="badge badge-warning">Suppressed / Presentation Only</span> (${telem.retrieval_skip_reason || 'No search needed'})`;
+          document.getElementById('controllerLog').innerHTML = `<span class="badge badge-warning">Suppressed / Presentation Only</span> (${esc(telem.retrieval_skip_reason) || 'No search needed'})`;
         }
 
         // Render Sub-queries
         const subQs = telem.sub_queries || [];
         document.getElementById('intentCount').innerText = `${subQs.length} Intent(s)`;
         document.getElementById('decomposeLog').innerHTML = subQs.map((q, idx) => 
-          `<div style="margin-bottom:4px;"><strong>Intent ${idx + 1}:</strong> <span style="color:#fff;">${q}</span></div>`
+          `<div style="margin-bottom:4px;"><strong>Intent ${idx + 1}:</strong> <span style="color:#fff;">${esc(q)}</span></div>`
         ).join('') || 'Single direct intent.';
 
         // Render Retrieval Events & Citations
         const citations = telem.citations || [];
-        document.getElementById('evidenceCount').innerText = `${telem.retrieval_events.length} Search Event(s)`;
+        document.getElementById('evidenceCount').innerText = `${(telem.retrieval_events || []).length} Search Event(s)`;
         let evidenceHtml = '';
-        if (telem.retrieval_events.length === 0) {
+        if (!telem.retrieval_events || telem.retrieval_events.length === 0) {
           evidenceHtml = '<div style="color:var(--text-muted)">Zero retrieval events fired (Presentation/Suppression turn).</div>';
         } else {
           evidenceHtml = telem.retrieval_events.map(ev => 
-            `<div style="margin-bottom:4px;"><span class="badge badge-primary">${ev.trigger}</span> @ <code>${ev.timestamp_s}s</code>: "${ev.query}"</div>`
+            `<div style="margin-bottom:4px;"><span class="badge badge-primary">${esc(ev.trigger)}</span> @ <code>${esc(ev.timestamp_s)}s</code>: &quot;${esc(ev.query)}&quot;</div>`
           ).join('');
         }
         if (citations.length > 0) {
-          evidenceHtml += `<div style="margin-top:8px;"><strong>Verified Tags Cited:</strong> ` + citations.map(c => `<span class="tag-chip">${c}</span>`).join('') + `</div>`;
+          evidenceHtml += `<div style="margin-top:8px;"><strong>Verified Tags Cited:</strong> ` + citations.map(c => `<span class="tag-chip">${esc(c)}</span>`).join('') + `</div>`;
         }
         document.getElementById('evidenceLog').innerHTML = evidenceHtml;
 
@@ -271,7 +278,8 @@
         document.getElementById('turnId').value = turnId + 1;
 
       } catch (err) {
-        document.getElementById('answerOutput').innerHTML = `<span style="color:var(--error);">Error: ${err.message}</span>`;
+        const msg = err && err.name === 'AbortError' ? 'Request timed out after 90s — please retry.' : String((err && err.message) || err).slice(0, 300);
+        document.getElementById('answerOutput').innerText = 'Error: ' + msg;
       } finally {
         btn.disabled = false;
         btn.innerText = 'Run Streaming Turn';

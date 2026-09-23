@@ -144,24 +144,12 @@ def run_full_eval():
     scorecard_path = os.path.join(results_dir, "scorecard.json")
 
     to_save = dict(results)
-    if os.path.exists(scorecard_path):
-        try:
-            with open(scorecard_path, "r", encoding="utf-8") as f:
-                prev = json.load(f)
-            # If live keys were missing, preserve verified passes from previous full runs
-            if not bool(os.getenv("GROQ_API_KEY")):
-                if prev.get("g3", {}).get("passed"):
-                    to_save["g3"] = prev["g3"]
-                if prev.get("g5", {}).get("passed"):
-                    to_save["g5"] = prev["g5"]
-        except Exception:
-            pass
 
     with open(scorecard_path, "w", encoding="utf-8") as f:
         json.dump(to_save, f, indent=2)
 
-    # Print final formatted scorecard
-    print_scorecard(results)
+    # Print final formatted scorecard (print what was actually saved).
+    print_scorecard(to_save)
     print(f"Benchmark results written to: {scorecard_path}")
     print(f"Total evaluation time: {time.time() - start_time:.2f}s\n")
 

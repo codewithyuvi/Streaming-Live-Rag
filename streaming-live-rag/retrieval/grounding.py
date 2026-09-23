@@ -11,7 +11,10 @@ ONE_TAG = re.compile(r"Doc_(\d+)\s*(?:§\s*([\w.\-]+))?", re.I)         # Doc_01
 ABSTAIN = re.compile(
     r"\b(not (?:available|found|mentioned|specified|covered|included)"
     r"|no (?:relevant )?information (?:is |was )?(?:available|found|provided)"
-    r"|cannot (?:be )?(?:determined|verified)|insufficient (?:information|evidence))\b",
+    r"|cannot (?:be )?(?:determined|verified|answer(?: that)? reliably)"
+    r"|could not (?:be )?(?:determined|verified|answer)"
+    r"|unable to (?:verify|determine|answer)"
+    r"|insufficient (?:information|evidence))\b",
     re.I
 )
 
@@ -104,6 +107,16 @@ def validate(answer: str, retrieved_tags: list[str]) -> Report:
     avail = {t for x in retrieved_tags for t in tags_in(f"[{x}]")}
     r = Report(cited=list(dict.fromkeys(tags_in(answer))))
     r.fabricated = [t for t in r.cited if t not in avail]
+
+    # Canonical abstention messages produced by the pipeline are grounded
+    # by construction — they assert no facts and cite nothing.
+    stripped = answer.strip()
+    if stripped in (
+        "This information is not available in the provided documents.",
+        "I cannot answer that reliably based on the provided documents.",
+    ) and not r.cited and not r.fabricated:
+        r.abstained = True
+        return r
 
     # Normalize: if punctuation precedes bracket citation (e.g. "claim. [Doc_01 §1]"),
     # move punctuation to end of citation tag so it attaches to its claim sentence
