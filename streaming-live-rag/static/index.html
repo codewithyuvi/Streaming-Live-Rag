@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -77,6 +77,85 @@
   <div class="grid">
     <!-- Left Panel: Controls & Presets -->
     <div>
+      <!-- BYOK & Model Providers Settings -->
+      <div class="card" style="border-color: rgba(168, 85, 247, 0.4);">
+        <h2 style="color: #c084fc; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;">
+          <span>⚙️ BYOK API Setup</span>
+          <a href="#" onclick="toggleByok(event)" id="byokToggleLink" style="font-size: 0.75rem; color: #c084fc; text-decoration: none;">[Configure]</a>
+        </h2>
+        <div id="byokPanel" style="display: none; margin-top: 10px;">
+          <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 8px;">
+            Choose third-party providers (Groq, Ollama, NVIDIA NIM, OpenAI, or custom):
+          </p>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px;">
+            <button type="button" class="scenario-btn" style="padding: 4px 8px; font-size: 0.7rem; width: auto; margin-bottom: 2px;" onclick="applyByokPreset('groq_gemini')">⚡ Groq+Gemini</button>
+            <button type="button" class="scenario-btn" style="padding: 4px 8px; font-size: 0.7rem; width: auto; margin-bottom: 2px;" onclick="applyByokPreset('ollama')">🦙 Ollama (Local)</button>
+            <button type="button" class="scenario-btn" style="padding: 4px 8px; font-size: 0.7rem; width: auto; margin-bottom: 2px;" onclick="applyByokPreset('nvidia')">🟢 NVIDIA NIM</button>
+            <button type="button" class="scenario-btn" style="padding: 4px 8px; font-size: 0.7rem; width: auto; margin-bottom: 2px;" onclick="applyByokPreset('openai')">🤖 OpenAI</button>
+          </div>
+
+          <strong style="font-size: 0.75rem; color: var(--accent); display: block; margin-bottom: 4px;">Fast Controller / Decomposer:</strong>
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Provider</label>
+          <select id="fastProvider" onchange="onFastProviderChange()" style="width: 100%; background: #0b1120; border: 1px solid var(--border); color: #fff; padding: 6px; font-size: 0.75rem; border-radius: 6px; margin-bottom: 6px;">
+            <option value="groq">Groq (Cloud Fast)</option>
+            <option value="ollama">Ollama (Local / No Key)</option>
+            <option value="nvidia">NVIDIA NIM</option>
+            <option value="openai">OpenAI</option>
+            <option value="custom">Custom (vLLM / LM Studio)</option>
+          </select>
+
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Fast API Key</label>
+          <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+            <input type="password" id="fastApiKey" placeholder="gsk_... or leave blank for Ollama" style="padding: 6px 10px; font-size: 0.75rem; margin-bottom: 0; flex: 1;" />
+            <button type="button" onclick="clearKey('fast')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; font-size: 0.7rem; padding: 4px 8px; border-radius: 6px; cursor: pointer;">Clear</button>
+          </div>
+
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Fast Model</label>
+          <input type="text" id="fastModel" value="llama-3.1-8b-instant" style="padding: 6px 10px; font-size: 0.75rem; margin-bottom: 6px;" />
+
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Fast Base URL (optional)</label>
+          <input type="text" id="fastBaseUrl" placeholder="https://api.groq.com/openai/v1" style="padding: 6px 10px; font-size: 0.75rem; margin-bottom: 10px;" />
+
+          <strong style="font-size: 0.75rem; color: var(--success); display: block; margin-bottom: 4px;">Quality Synthesis Provider:</strong>
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Provider</label>
+          <select id="synthesisProvider" onchange="onSynthesisProviderChange()" style="width: 100%; background: #0b1120; border: 1px solid var(--border); color: #fff; padding: 6px; font-size: 0.75rem; border-radius: 6px; margin-bottom: 6px;">
+            <option value="gemini">Google Gemini</option>
+            <option value="nvidia">NVIDIA NIM</option>
+            <option value="groq">Groq (70B)</option>
+            <option value="ollama">Ollama (Local)</option>
+            <option value="openai">OpenAI</option>
+            <option value="custom">Custom</option>
+          </select>
+
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Synthesis API Key</label>
+          <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+            <input type="password" id="synthesisApiKey" placeholder="AIzaSy... or nvapi-..." style="padding: 6px 10px; font-size: 0.75rem; margin-bottom: 0; flex: 1;" />
+            <button type="button" onclick="clearKey('synthesis')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; font-size: 0.7rem; padding: 4px 8px; border-radius: 6px; cursor: pointer;">Clear</button>
+          </div>
+
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Synthesis Model</label>
+          <input type="text" id="synthesisModel" value="gemini-2.5-flash" style="padding: 6px 10px; font-size: 0.75rem; margin-bottom: 6px;" />
+
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Synthesis Base URL (optional)</label>
+          <input type="text" id="synthesisBaseUrl" placeholder="" style="padding: 6px 10px; font-size: 0.75rem; margin-bottom: 10px;" />
+
+          <label style="font-size: 0.7rem; margin-bottom: 2px;">Admin Token (Required if ADMIN_TOKEN is configured on server)</label>
+          <input type="password" id="adminToken" placeholder="Leave blank for local default" style="padding: 6px 10px; font-size: 0.75rem; margin-bottom: 10px;" />
+
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn" onclick="testByokConnection()" style="background: rgba(168, 85, 247, 0.2); border: 1px solid #c084fc; color: #fff; font-size: 0.78rem; padding: 6px 10px; flex: 1;">
+              Test Connection
+            </button>
+            <button type="button" class="btn" onclick="saveByokConfig()" style="background: #a855f7; color: #fff; font-size: 0.78rem; padding: 6px 10px; flex: 1;">
+              Save &amp; Apply
+            </button>
+          </div>
+
+          <div id="byokStatus" style="display: none; margin-top: 8px; padding: 6px 8px; border-radius: 6px; font-size: 0.75rem;"></div>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Demo Scenarios</h2>
         <button class="scenario-btn" onclick="setScenario('What is the maximum capacity of the workshop hall?', 'NEW_TOPIC')">
@@ -97,6 +176,41 @@
         <button class="scenario-btn" onclick="setScenario('What is the domestic train meal allowance in Mumbai?', 'NEW_TOPIC')">
           <strong>6. Out-of-Corpus Abstention (C6)</strong><br><small style="color:var(--text-muted)">Grounding enforcement prevents hallucination</small>
         </button>
+      </div>
+
+      <!-- Document Ingestion & Live Corpus Upload -->
+      <div class="card" style="border-color: rgba(56, 189, 248, 0.4);">
+        <h2 style="color: var(--accent);">📁 Upload Custom Data</h2>
+        <p style="color: var(--text-muted); font-size: 0.78rem; margin-bottom: 10px;">
+          Ingest your own files into the vector database in real-time (.pdf, .docx, .pptx, .xlsx, .csv, .json, .yaml, .html, .txt, .md).
+        </p>
+
+        <label for="docFile">Choose Document File</label>
+        <input type="file" id="docFile" accept=".pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.tsv,.json,.yaml,.yml,.html,.htm,.txt,.md,.rtf" style="margin-bottom: 8px; font-size: 0.8rem; color: #cbd5e1; width: 100%;" />
+
+        <div style="margin-bottom: 8px;">
+          <a href="#" onclick="togglePasteBox(event)" id="togglePasteLink" style="color: var(--accent); font-size: 0.78rem; text-decoration: none;">+ Or paste text directly</a>
+          <textarea id="pasteText" rows="3" placeholder="Paste custom document text here..." style="display: none; margin-top: 6px; font-size: 0.8rem;"></textarea>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+          <input type="checkbox" id="resetCorpus" style="cursor: pointer;" />
+          <label for="resetCorpus" style="margin: 0; font-size: 0.75rem; cursor: pointer; color: var(--text-muted);">Clear previous corpus (replace all)</label>
+        </div>
+
+        <button class="btn" id="uploadBtn" onclick="uploadDocument()" style="background: rgba(56, 189, 248, 0.2); border: 1px solid var(--accent); color: #fff; font-size: 0.85rem; padding: 8px;">
+          Upload &amp; Index to Vector DB
+        </button>
+
+        <div id="uploadStatus" style="display: none; margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 0.8rem;"></div>
+        
+        <div id="activeCorpusList" style="margin-top: 10px; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Indexed Chunks: <strong id="corpusChunkCount" style="color: #fff;">...</strong></span>
+            <a href="#" onclick="refreshCorpus(event)" style="color: var(--accent); text-decoration: none;">Refresh</a>
+          </div>
+          <div id="corpusDetails" style="margin-top: 4px; font-family: monospace; font-size: 0.7rem; color: #94a3b8;"></div>
+        </div>
       </div>
 
       <div class="card">
@@ -181,6 +295,47 @@
   </div>
 
   <script>
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function getAdminHeaders() {
+      const token = (document.getElementById('adminToken')?.value || '').trim();
+      const headers = {};
+      if (token) headers['x-admin-token'] = token;
+      return headers;
+    }
+
+    async function clearKey(slot) {
+      const box = document.getElementById('byokStatus');
+      try {
+        const res = await fetch(`/config/llm/key?slot=${encodeURIComponent(slot)}`, {
+          method: 'DELETE',
+          headers: getAdminHeaders()
+        });
+        if (!res.ok) {
+          let errDetail = '';
+          try { errDetail = (await res.json()).detail || await res.text(); } catch { errDetail = await res.text(); }
+          throw new Error(String(errDetail));
+        }
+        if (slot === 'fast') {
+          document.getElementById('fastApiKey').value = '';
+          document.getElementById('fastApiKey').placeholder = 'Cleared / Not Configured';
+        } else {
+          document.getElementById('synthesisApiKey').value = '';
+          document.getElementById('synthesisApiKey').placeholder = 'Cleared / Not Configured';
+        }
+        box.style.display = 'block';
+        box.style.background = 'rgba(16, 185, 129, 0.15)';
+        box.style.color = '#10b981';
+        box.innerText = `✅ ${slot} key cleared successfully.`;
+        setTimeout(() => { if (box.innerText.includes('cleared')) box.style.display = 'none'; }, 3000);
+      } catch (err) {
+        box.style.display = 'block';
+        box.style.background = 'rgba(239, 68, 68, 0.15)';
+        box.style.color = '#ef4444';
+        box.innerText = 'Clear key error: ' + (err.message || err);
+      }
+    }
+
     function setScenario(text, refType) {
       document.getElementById('utterance').value = text;
     }
@@ -221,7 +376,6 @@
 
         const data = await res.json();
         const telem = data.telemetry;
-        const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
         // Render Controller Decisions (all dynamic strings escaped — corpus/LLM text is untrusted)
         if (telem.controller_decisions && telem.controller_decisions.length > 0) {
@@ -285,6 +439,315 @@
         btn.innerText = 'Run Streaming Turn';
       }
     }
+
+    function togglePasteBox(e) {
+      if (e) e.preventDefault();
+      const ta = document.getElementById('pasteText');
+      const link = document.getElementById('togglePasteLink');
+      if (ta.style.display === 'none') {
+        ta.style.display = 'block';
+        link.innerText = '- Hide text box';
+      } else {
+        ta.style.display = 'none';
+        link.innerText = '+ Or paste text directly';
+      }
+    }
+
+    async function uploadDocument() {
+      const fileInput = document.getElementById('docFile');
+      const pasteText = document.getElementById('pasteText').value.trim();
+      const resetCheck = document.getElementById('resetCorpus').checked;
+      const uploadBtn = document.getElementById('uploadBtn');
+      const statusBox = document.getElementById('uploadStatus');
+
+      const hasFile = fileInput.files && fileInput.files.length > 0;
+      if (!hasFile && !pasteText) {
+        alert('Please choose a document file or paste text content to upload.');
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      uploadBtn.innerText = 'Indexing into Vector DB...';
+      statusBox.style.display = 'block';
+      statusBox.style.background = 'rgba(56, 189, 248, 0.1)';
+      statusBox.style.color = '#38bdf8';
+      statusBox.style.border = '1px solid rgba(56, 189, 248, 0.3)';
+      statusBox.innerText = 'Extracting sections and generating vector embeddings...';
+
+      const formData = new FormData();
+      if (hasFile) {
+        formData.append('file', fileInput.files[0]);
+      }
+      if (pasteText) {
+        formData.append('text', pasteText);
+      }
+      formData.append('reset', resetCheck ? 'true' : 'false');
+
+      try {
+        const res = await fetch('/upload', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: formData,
+        });
+
+        if (!res.ok) {
+          let errDetail = '';
+          try { errDetail = (await res.json()).detail || await res.text(); } catch { errDetail = await res.text(); }
+          throw new Error(String(errDetail));
+        }
+
+        const data = await res.json();
+        statusBox.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusBox.style.color = '#10b981';
+        statusBox.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+        const tagsHtml = (data.tags || []).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
+        statusBox.innerHTML = `<strong>✅ Indexed ${esc(data.sections_indexed)} section(s)</strong> (${esc(data.doc_id)}) in ${esc(data.indexing_time_ms)}ms.<br>` +
+          `<div style="margin-top:4px;">Tags: ${tagsHtml}</div>` +
+          `<small style="color:#cbd5e1; display:block; margin-top:4px;">Ready! Type questions about this file below.</small>`;
+
+        // Clear file input
+        fileInput.value = '';
+        document.getElementById('pasteText').value = '';
+        refreshCorpus();
+
+      } catch (err) {
+        statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusBox.style.color = '#ef4444';
+        statusBox.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+        statusBox.innerText = 'Upload failed: ' + (err.message || err);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.innerText = 'Upload & Index to Vector DB';
+      }
+    }
+
+    function toggleByok(e) {
+      if (e) e.preventDefault();
+      const p = document.getElementById('byokPanel');
+      const link = document.getElementById('byokToggleLink');
+      if (p.style.display === 'none') {
+        p.style.display = 'block';
+        link.innerText = '[Close]';
+        loadByokConfig();
+      } else {
+        p.style.display = 'none';
+        link.innerText = '[Configure]';
+      }
+    }
+
+    const byokPresets = {
+      groq_gemini: {
+        fastProvider: 'groq',
+        fastModel: 'llama-3.1-8b-instant',
+        fastBaseUrl: 'https://api.groq.com/openai/v1',
+        synthesisProvider: 'gemini',
+        synthesisModel: 'gemini-2.5-flash',
+        synthesisBaseUrl: '',
+      },
+      ollama: {
+        fastProvider: 'ollama',
+        fastModel: 'llama3.2',
+        fastBaseUrl: 'http://localhost:11434/v1',
+        synthesisProvider: 'ollama',
+        synthesisModel: 'llama3.1',
+        synthesisBaseUrl: 'http://localhost:11434/v1',
+      },
+      nvidia: {
+        fastProvider: 'nvidia',
+        fastModel: 'meta/llama-3.1-8b-instruct',
+        fastBaseUrl: 'https://integrate.api.nvidia.com/v1',
+        synthesisProvider: 'nvidia',
+        synthesisModel: 'meta/llama-3.3-70b-instruct',
+        synthesisBaseUrl: 'https://integrate.api.nvidia.com/v1',
+      },
+      openai: {
+        fastProvider: 'openai',
+        fastModel: 'gpt-4o-mini',
+        fastBaseUrl: 'https://api.openai.com/v1',
+        synthesisProvider: 'openai',
+        synthesisModel: 'gpt-4o',
+        synthesisBaseUrl: 'https://api.openai.com/v1',
+      }
+    };
+
+    function applyByokPreset(name) {
+      const p = byokPresets[name];
+      if (!p) return;
+      document.getElementById('fastProvider').value = p.fastProvider;
+      document.getElementById('fastModel').value = p.fastModel;
+      document.getElementById('fastBaseUrl').value = p.fastBaseUrl;
+      document.getElementById('synthesisProvider').value = p.synthesisProvider;
+      document.getElementById('synthesisModel').value = p.synthesisModel;
+      document.getElementById('synthesisBaseUrl').value = p.synthesisBaseUrl;
+    }
+
+    function onFastProviderChange() {
+      const p = document.getElementById('fastProvider').value;
+      if (p === 'groq') {
+        document.getElementById('fastBaseUrl').value = 'https://api.groq.com/openai/v1';
+        document.getElementById('fastModel').value = 'llama-3.1-8b-instant';
+      } else if (p === 'ollama') {
+        document.getElementById('fastBaseUrl').value = 'http://localhost:11434/v1';
+        document.getElementById('fastModel').value = 'llama3.2';
+      } else if (p === 'nvidia') {
+        document.getElementById('fastBaseUrl').value = 'https://integrate.api.nvidia.com/v1';
+        document.getElementById('fastModel').value = 'meta/llama-3.1-8b-instruct';
+      } else if (p === 'openai') {
+        document.getElementById('fastBaseUrl').value = 'https://api.openai.com/v1';
+        document.getElementById('fastModel').value = 'gpt-4o-mini';
+      }
+    }
+
+    function onSynthesisProviderChange() {
+      const p = document.getElementById('synthesisProvider').value;
+      if (p === 'gemini') {
+        document.getElementById('synthesisBaseUrl').value = '';
+        document.getElementById('synthesisModel').value = 'gemini-2.5-flash';
+      } else if (p === 'nvidia') {
+        document.getElementById('synthesisBaseUrl').value = 'https://integrate.api.nvidia.com/v1';
+        document.getElementById('synthesisModel').value = 'meta/llama-3.3-70b-instruct';
+      } else if (p === 'groq') {
+        document.getElementById('synthesisBaseUrl').value = 'https://api.groq.com/openai/v1';
+        document.getElementById('synthesisModel').value = 'llama-3.3-70b-versatile';
+      } else if (p === 'ollama') {
+        document.getElementById('synthesisBaseUrl').value = 'http://localhost:11434/v1';
+        document.getElementById('synthesisModel').value = 'llama3.1';
+      } else if (p === 'openai') {
+        document.getElementById('synthesisBaseUrl').value = 'https://api.openai.com/v1';
+        document.getElementById('synthesisModel').value = 'gpt-4o';
+      }
+    }
+
+    async function loadByokConfig() {
+      try {
+        const res = await fetch('/config/llm');
+        if (!res.ok) return;
+        const cfg = await res.json();
+        if (cfg.fast_provider) document.getElementById('fastProvider').value = cfg.fast_provider;
+        if (cfg.fast_model) document.getElementById('fastModel').value = cfg.fast_model;
+        if (cfg.fast_base_url) document.getElementById('fastBaseUrl').value = cfg.fast_base_url;
+        document.getElementById('fastApiKey').placeholder = cfg.fast_key_configured ? 'Configured (Write-Only)' : 'gsk_... or leave blank for Ollama';
+
+        if (cfg.synthesis_provider) document.getElementById('synthesisProvider').value = cfg.synthesis_provider;
+        if (cfg.synthesis_model) document.getElementById('synthesisModel').value = cfg.synthesis_model;
+        if (cfg.synthesis_base_url) document.getElementById('synthesisBaseUrl').value = cfg.synthesis_base_url;
+        document.getElementById('synthesisApiKey').placeholder = cfg.synthesis_key_configured ? 'Configured (Write-Only)' : 'AIzaSy... or nvapi-...';
+      } catch (err) {
+        console.warn('Failed to load LLM config', err);
+      }
+    }
+
+    async function testByokConnection() {
+      const box = document.getElementById('byokStatus');
+      box.style.display = 'block';
+      box.style.background = 'rgba(56, 189, 248, 0.15)';
+      box.style.color = '#38bdf8';
+      box.innerText = 'Pinging configured providers...';
+
+      // Save first so test uses current values
+      await saveByokConfig(true);
+
+      try {
+        const res = await fetch('/config/llm/test', {
+          method: 'POST',
+          headers: getAdminHeaders()
+        });
+        const data = await res.json();
+        let html = '';
+        const fast = data.fast || {};
+        const synth = data.synthesis || {};
+
+        if (fast.ok) {
+          html += `<div>✅ <strong>Fast (${esc(fast.provider)}):</strong> OK (${esc(fast.latency_ms)}ms) [${esc(fast.model)}]</div>`;
+        } else {
+          html += `<div style="color:#ef4444;">❌ <strong>Fast (${esc(fast.provider)}):</strong> ${esc(fast.error || 'Failed')}</div>`;
+        }
+
+        if (synth.ok) {
+          html += `<div>✅ <strong>Synthesis (${esc(synth.provider)}):</strong> OK (${esc(synth.latency_ms)}ms) [${esc(synth.model)}]</div>`;
+        } else {
+          html += `<div style="color:#ef4444;">❌ <strong>Synthesis (${esc(synth.provider)}):</strong> ${esc(synth.error || 'Failed')}</div>`;
+        }
+
+        box.style.background = 'rgba(15, 23, 42, 0.9)';
+        box.style.color = '#cbd5e1';
+        box.style.border = '1px solid var(--border)';
+        box.innerHTML = html;
+      } catch (err) {
+        box.style.color = '#ef4444';
+        box.innerText = 'Test request failed: ' + (err.message || err);
+      }
+    }
+
+    async function saveByokConfig(silent = false) {
+      const box = document.getElementById('byokStatus');
+      const payload = {
+        fast_provider: document.getElementById('fastProvider').value,
+        fast_model: document.getElementById('fastModel').value.trim(),
+        fast_base_url: document.getElementById('fastBaseUrl').value.trim(),
+        synthesis_provider: document.getElementById('synthesisProvider').value,
+        synthesis_model: document.getElementById('synthesisModel').value.trim(),
+        synthesis_base_url: document.getElementById('synthesisBaseUrl').value.trim(),
+      };
+
+      const fastKey = document.getElementById('fastApiKey').value.trim();
+      if (fastKey) payload.fast_api_key = fastKey;
+
+      const synthKey = document.getElementById('synthesisApiKey').value.trim();
+      if (synthKey) payload.synthesis_api_key = synthKey;
+
+      try {
+        const res = await fetch('/config/llm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          let errDetail = '';
+          try { errDetail = (await res.json()).detail || await res.text(); } catch { errDetail = await res.text(); }
+          throw new Error(String(errDetail));
+        }
+        if (!silent) {
+          box.style.display = 'block';
+          box.style.background = 'rgba(16, 185, 129, 0.15)';
+          box.style.color = '#10b981';
+          box.innerText = '✅ Provider configuration saved and applied!';
+          setTimeout(() => { if (box.innerText.includes('saved')) box.style.display = 'none'; }, 4000);
+        }
+      } catch (err) {
+        if (!silent) {
+          box.style.display = 'block';
+          box.style.background = 'rgba(239, 68, 68, 0.15)';
+          box.style.color = '#ef4444';
+          box.innerText = 'Save error: ' + err.message;
+        }
+      }
+    }
+
+    async function refreshCorpus(e) {
+      if (e) e.preventDefault();
+      try {
+        const res = await fetch('/corpus');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('corpusChunkCount').innerText = `${data.total_chunks || 0} chunks`;
+        const docs = data.documents || [];
+        if (docs.length > 0) {
+          document.getElementById('corpusDetails').innerHTML = docs.map(d =>
+            `<div>• <strong>${esc(d.doc_id)}</strong> (${esc(d.filename || 'Direct Text')}): ${esc(d.section_count)} section(s)</div>`
+          ).join('');
+        } else {
+          document.getElementById('corpusDetails').innerText = 'No documents indexed.';
+        }
+      } catch (err) {
+        console.warn('Corpus refresh failed', err);
+      }
+    }
+
+    // Auto-refresh active corpus on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshCorpus();
+    });
   </script>
 </body>
 </html>

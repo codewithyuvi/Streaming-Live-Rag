@@ -126,7 +126,7 @@ def evaluate_g3():
             print(f"   ↳ Over-fragmentation {over_frag_rate:.1f}% exceeds 30% threshold")
     print(f"{'=' * 70}")
 
-    return passed
+    return passed, f"{g3_score:.1f}%"
 
 
 if __name__ == "__main__":

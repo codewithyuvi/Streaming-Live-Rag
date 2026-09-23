@@ -1,4 +1,4 @@
-﻿"""
+"""
 Gate 6 — Telemetry & Observability Evaluation (G6).
 
 Audits logs/telemetry.jsonl for:
@@ -99,21 +99,18 @@ def evaluate_g6():
 
     log_path = os.path.join(ROOT_DIR, "logs", "telemetry.jsonl")
     if not os.path.exists(log_path):
-        # Fresh clone / ignored log: validate the synthetic event itself so the
-        # gate proves schema coverage without requiring a committed log file.
-        last_event_raw = json.loads(sample_event.model_dump_json())
-        print("ℹ️ No production telemetry log found; auditing synthetic event (fresh-clone safe).")
-        lines = [sample_event.model_dump_json()]
-    else:
-        with open(log_path, "r", encoding="utf-8") as f:
-            lines = [line.strip() for line in f if line.strip()]
+        print("❌ Telemetry log file missing: logs/telemetry.jsonl (run pipeline turns first)")
+        return False, "Missing logs/telemetry.jsonl — run turns first"
 
-        if not lines:
-            print("❌ Telemetry log file is empty.")
-            return False
+    with open(log_path, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip()]
 
-        # Audit the last event in the log
-        last_event_raw = json.loads(lines[-1])
+    if not lines:
+        print("❌ Telemetry log file is empty: logs/telemetry.jsonl (run pipeline turns first)")
+        return False, "Empty logs/telemetry.jsonl — run turns first"
+
+    # Audit the last event in the log
+    last_event_raw = json.loads(lines[-1])
     field_checks = []
     
     for field_name in REQUIRED_FIELDS:
@@ -152,7 +149,7 @@ def evaluate_g6():
         print("🔴 GATE 6 FAILED")
     print("=" * 70)
 
-    return passed
+    return passed, f"{coverage_rate:.1f}%"
 
 
 if __name__ == "__main__":

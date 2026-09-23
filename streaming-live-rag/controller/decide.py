@@ -32,11 +32,11 @@ def decide_retrieval(partial_utterance: str) -> dict:
     Rules for Triggering:
     1. retrieve_now (AGGRESSIVE EARLY RETRIEVAL): 
        Trigger AS SOON AS a strong entity, noun phrase, or clear search intent is visible, EVEN IF the sentence is grammatically incomplete. 
-       - "What is the maximum capacity of" -> retrieve_now (keyword "maximum capacity")
-       - "I need to travel to Pune for the" -> retrieve_now ("travel to Pune")
-       - "Who needs to approve international" -> retrieve_now ("approve international")
-       - "What is the hotel" -> retrieve_now (keyword "hotel")
-       - "Who handles the projector" -> retrieve_now (keyword "projector")
+       - "What is the maximum capacity" -> retrieve_now (keyword "maximum capacity")
+       - "I need to travel to Pune" -> retrieve_now ("travel to Pune")
+       - "Who needs to approve international travel" -> retrieve_now ("approve international travel")
+       - "What is the hotel reimbursement limit" -> retrieve_now (keyword "hotel reimbursement limit")
+       - "Who handles the projector remote" -> retrieve_now (keyword "projector remote")
     
     2. no_retrieval_needed (CONVERSATIONAL / PRESENTATION):
        Trigger for greetings, pleasantries, generic requests for help, or meeting management chatter where no factual lookup is needed.

@@ -73,6 +73,9 @@ class Session:
             effective_query=effective_query or utterance,
         )
         self.turns.append(record)
+        # Cap audit trail to last 50 turns to prevent memory growth under extended use
+        if len(self.turns) > 50:
+            self.turns = self.turns[-50:]
 
         if kind == "NEW_TOPIC":
             self.current_query = effective_query or utterance
@@ -162,13 +165,19 @@ def _evict_expired_locked(now: float | None = None) -> None:
     now = now if now is not None else _time.time()
     expired = [k for k, ts in _sessions_last_access.items() if now - ts > _SESSION_TTL_S]
     for k in expired:
+        if k in _session_locks and _session_locks[k].locked():
+            continue  # Never evict a session whose lock is currently acquired by an active turn
         _sessions.pop(k, None)
         _sessions_last_access.pop(k, None)
         _session_locks.pop(k, None)
     # Hard cap: drop oldest if over limit
     if len(_sessions) > _MAX_SESSIONS:
         oldest = sorted(_sessions_last_access.items(), key=lambda kv: kv[1])
-        for k, _ in oldest[: len(_sessions) - _MAX_SESSIONS]:
+        for k, _ in oldest:
+            if len(_sessions) <= _MAX_SESSIONS:
+                break
+            if k in _session_locks and _session_locks[k].locked():
+                continue
             _sessions.pop(k, None)
             _sessions_last_access.pop(k, None)
             _session_locks.pop(k, None)

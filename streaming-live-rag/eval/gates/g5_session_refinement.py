@@ -30,7 +30,7 @@ def evaluate_g5():
 
     if not labeled_cases:
         print("No refinement-labeled cases found in eval set.")
-        return False
+        return False, "No labeled cases"
 
     correct = 0
     total = len(labeled_cases)
@@ -130,7 +130,7 @@ def evaluate_g5():
         print("🔴 GATE 5 FAILED")
     print(f"{'=' * 70}")
 
-    return score >= 90
+    return score >= 90, f"{score:.1f}% ({correct}/{total})"
 
 
 if __name__ == "__main__":

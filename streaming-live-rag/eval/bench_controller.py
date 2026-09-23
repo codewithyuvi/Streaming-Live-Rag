@@ -1,7 +1,17 @@
 import os
+import sys
+import time
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 from streaming.stream_simulator import simulate_stream
-from controller.heuristics import is_stable_enough
+from controller.heuristics import is_stable_enough, get_stable_query_prefix
 from controller.decide import decide_retrieval
 
 def evaluate_controller():
@@ -16,6 +26,7 @@ def evaluate_controller():
     
     no_retrieval_count = 0
     false_trigger_count = 0
+    latencies = []
     
     for q in queries:
         utterance = q["utterance"]
@@ -27,12 +38,16 @@ def evaluate_controller():
         triggered_early = False
         
         for i, chunk in enumerate(chunks):
-            if not is_stable_enough(chunk.partial_text):
+            candidate = get_stable_query_prefix(chunk.partial_text)
+            if not candidate:
                 continue
                 
-            decision = decide_retrieval(chunk.partial_text)
+            t0 = time.perf_counter()
+            decision = decide_retrieval(candidate)
+            lat_ms = (time.perf_counter() - t0) * 1000.0
+            latencies.append(lat_ms)
             
-            if decision["trigger"] == "retrieve_now":
+            if decision.get("trigger") == "retrieve_now":
                 triggered = True
                 if i < len(chunks) - 1:
                     triggered_early = True
@@ -52,10 +67,16 @@ def evaluate_controller():
 
     g2_score = (early_trigger_count / eligible_count) * 100 if eligible_count > 0 else 0
     false_trigger_rate = (false_trigger_count / no_retrieval_count) * 100 if no_retrieval_count > 0 else 0
+
+    avg_lat = sum(latencies) / len(latencies) if latencies else 0.0
+    sorted_lats = sorted(latencies)
+    p50_lat = sorted_lats[int(len(sorted_lats) * 0.5)] if sorted_lats else 0.0
+    p95_lat = sorted_lats[min(int(len(sorted_lats) * 0.95), len(sorted_lats) - 1)] if sorted_lats else 0.0
     
     print("=== Controller Benchmark (G2) ===")
     print(f"Early Retrieval Rate: {g2_score:.1f}% ({early_trigger_count}/{eligible_count})")
     print(f"False-Trigger Rate (Chit-chat): {false_trigger_rate:.1f}% ({false_trigger_count}/{no_retrieval_count})")
+    print(f"Decision Latency: Avg={avg_lat:.1f}ms, P50={p50_lat:.1f}ms, P95={p95_lat:.1f}ms (N={len(latencies)})")
 
 if __name__ == "__main__":
     evaluate_controller()

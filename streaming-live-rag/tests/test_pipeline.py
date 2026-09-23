@@ -112,3 +112,68 @@ def test_rate_limiter():
     _session_request_times["test_rate_session"] = [time.time()] * 60
     assert _check_rate_limit("test_rate_session") is False
     assert _check_rate_limit("fresh_session") is True
+
+
+def test_universal_document_parsers():
+    from retrieval.parsers import extract_sections
+
+    # 1. Text & Markdown
+    md_bytes = b"# Introduction\nSamsung Galaxy AI is integrated.\n\n## Hardware\nExynos and Snapdragon processors."
+    md_sections = extract_sections("specs.md", md_bytes, "Doc_05")
+    assert len(md_sections) >= 1
+    assert md_sections[0]["doc_id"] == "Doc_05"
+    assert "Doc_05 §1" in md_sections[0]["tag"]
+
+    # 2. JSON
+    json_bytes = b'{"battery": "5000mAh", "display": "6.8 AMOLED"}'
+    json_sections = extract_sections("specs.json", json_bytes, "Doc_06")
+    assert len(json_sections) >= 1
+    assert "Doc_06 §1" in json_sections[0]["tag"]
+
+    # 3. CSV
+    csv_bytes = b"Feature,Specification\nBattery,5000mAh\nDisplay,120Hz"
+    csv_sections = extract_sections("specs.csv", csv_bytes, "Doc_07")
+    assert len(csv_sections) >= 1
+    assert "Doc_07 §1" in csv_sections[0]["tag"]
+
+
+def test_corpus_endpoints():
+    client = TestClient(app)
+
+    # 1. GET /corpus returns 200 with dictionary
+    res_corpus = client.get("/corpus")
+    assert res_corpus.status_code == 200
+    assert "total_chunks" in res_corpus.json()
+
+    # 2. POST /upload with empty request returns 400
+    res_upload_empty = client.post("/upload")
+    assert res_upload_empty.status_code == 400
+
+
+def test_byok_config_endpoints(monkeypatch):
+    client = TestClient(app)
+
+    # 1. GET /config/llm returns active providers with masked keys
+    res = client.get("/config/llm")
+    assert res.status_code == 200
+    cfg = res.json()
+    assert "fast_provider" in cfg
+    assert "synthesis_provider" in cfg
+    assert "fast_api_key" not in cfg  # Secret keys must never be exposed unmasked
+
+    # 2. POST /config/llm updates configuration dynamically
+    res_update = client.post(
+        "/config/llm",
+        json={"fast_provider": "groq", "fast_model": "llama-3.1-8b-instant"}
+    )
+    assert res_update.status_code == 200
+    assert res_update.json()["fast_model"] == "llama-3.1-8b-instant"
+
+    # 3. POST /config/llm/test endpoint returns connectivity report
+    monkeypatch.setattr("api.main.test_llm_connection", lambda target="both": {"fast": {"ok": True, "latency_ms": 150.0}})
+    res_test = client.post("/config/llm/test?target=fast")
+    assert res_test.status_code == 200
+    assert res_test.json()["fast"]["ok"] is True
+
+
+

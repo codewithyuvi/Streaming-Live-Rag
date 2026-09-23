@@ -178,7 +178,7 @@ def evaluate_g4():
         print("🔴 GATE 4 FAILED")
     print(f"{'=' * 70}")
 
-    return gate_passed
+    return gate_passed, f"{score:.1f}%"
 
 
 if __name__ == "__main__":

@@ -16,6 +16,9 @@ if hasattr(sys.stdout, "reconfigure"):
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT_DIR)
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from eval.gates.g1_reproducibility import evaluate_g1
 from eval.gates.g2_early_retrieval import evaluate_g2
 from eval.gates.g4_grounding import evaluate_g4
@@ -33,11 +36,11 @@ def run_full_eval():
 
     # Gate 1: Reproducibility & Packaging
     try:
-        g1_ok = evaluate_g1()
+        g1_ok, g1_metric = evaluate_g1()
         results["g1"] = {
             "name": "Reproducibility & Packaging",
             "passed": g1_ok,
-            "measured": "100.0%",
+            "measured": g1_metric,
             "target": "100.0%",
         }
     except Exception as e:
@@ -45,11 +48,11 @@ def run_full_eval():
 
     # Gate 2: Early Retrieval
     try:
-        g2_ok = evaluate_g2()
+        g2_ok, g2_metric = evaluate_g2()
         results["g2"] = {
             "name": "Early Retrieval Trigger",
             "passed": g2_ok,
-            "measured": "100.0%",
+            "measured": g2_metric,
             "target": ">= 80%",
         }
     except Exception as e:
@@ -60,11 +63,11 @@ def run_full_eval():
         from eval.gates.g3_multi_intent import evaluate_g3
         has_groq_key = bool(os.getenv("GROQ_API_KEY"))
         if has_groq_key:
-            g3_ok = evaluate_g3()
+            g3_ok, g3_metric = evaluate_g3()
             results["g3"] = {
                 "name": "Multi-Intent Decomposition",
                 "passed": g3_ok,
-                "measured": "Passed" if g3_ok else "Failed",
+                "measured": g3_metric,
                 "target": ">= 70%",
             }
         else:
@@ -87,11 +90,11 @@ def run_full_eval():
 
     # Gate 4: Grounding Support & Zero Fabricated IDs
     try:
-        g4_ok = evaluate_g4()
+        g4_ok, g4_metric = evaluate_g4()
         results["g4"] = {
             "name": "Grounding Support & Zero Fabrication",
             "passed": g4_ok,
-            "measured": "100.0%",
+            "measured": g4_metric,
             "target": ">= 85%, 0 fab",
         }
     except Exception as e:
@@ -102,11 +105,11 @@ def run_full_eval():
         from eval.gates.g5_session_refinement import evaluate_g5
         has_groq_key = bool(os.getenv("GROQ_API_KEY"))
         if has_groq_key:
-            g5_ok = evaluate_g5()
+            g5_ok, g5_metric = evaluate_g5()
             results["g5"] = {
                 "name": "Session Refinement & Suppression",
                 "passed": g5_ok,
-                "measured": "Passed" if g5_ok else "Failed",
+                "measured": g5_metric,
                 "target": "100%",
             }
         else:
@@ -128,11 +131,11 @@ def run_full_eval():
 
     # Gate 6: Telemetry & Observability
     try:
-        g6_ok = evaluate_g6()
+        g6_ok, g6_metric = evaluate_g6()
         results["g6"] = {
             "name": "Telemetry Observability",
             "passed": g6_ok,
-            "measured": "100.0%",
+            "measured": g6_metric,
             "target": "100% trace coverage",
         }
     except Exception as e:

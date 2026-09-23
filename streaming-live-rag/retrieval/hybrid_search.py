@@ -98,6 +98,7 @@ def retrieve_and_rerank(query: str, rerank_against: str | None = None, top_k: in
             values=query_sparse_obj.values.tolist()
         )
 
+        t_retrieval_start = time.perf_counter()
         prefetch_limit = max(top_k * 2, 10)
         search_result = client.query_points(
             collection_name=_collection_name(),
@@ -110,13 +111,16 @@ def retrieve_and_rerank(query: str, rerank_against: str | None = None, top_k: in
         )
 
         points = search_result.points if hasattr(search_result, "points") else search_result
-        docs = [(hit.payload or {}).get("text", "") for hit in points if hit is not None and getattr(hit, "payload", None) is not None]
+        # Maintain strict 1:1 alignment: filter points and text payloads in a single pass
+        valid_points = [p for p in points if p is not None and getattr(p, "payload", None) is not None]
+        docs = [(p.payload or {}).get("text", "") for p in valid_points]
 
         if not docs:
             return []
 
+        t_rerank_start = time.perf_counter()
         scores = list(cross_encoder.rerank(rerank_query, docs))
-        scored_hits = sorted(zip(scores, points), key=lambda x: x[0], reverse=True)
+        scored_hits = sorted(zip(scores, valid_points), key=lambda x: x[0], reverse=True)
         return scored_hits[:top_k]
     except Exception as e:
         import logging
@@ -126,11 +130,43 @@ def retrieve_and_rerank(query: str, rerank_against: str | None = None, top_k: in
 
 def search(query: str, top_k: int = 3) -> Tuple[List[Any], float, float]:
     """
-    Convenience wrapper returning (best_points, retrieval_latency_ms, rerank_latency_ms).
+    Convenience wrapper returning (best_points, retrieval_latency_ms, rerank_latency_ms)
+    with genuine, independently measured component latencies.
     """
-    t0 = time.time()
-    scored_hits = retrieve_and_rerank(query, top_k=top_k)
-    t_end = time.time()
-    total_ms = (t_end - t0) * 1000
-    points = [hit for _, hit in scored_hits]
-    return points, total_ms * 0.6, total_ms * 0.4
+    client = get_qdrant_client()
+    embedding_model = get_embedding_model()
+    sparse_model = get_sparse_embedding_model()
+    cross_encoder = get_cross_encoder()
+
+    t_retrieval_start = time.perf_counter()
+    query_dense = next(iter(embedding_model.query_embed([query])))
+    query_sparse_obj = next(iter(sparse_model.query_embed([query])))
+    query_sparse = SparseVector(
+        indices=query_sparse_obj.indices.tolist(),
+        values=query_sparse_obj.values.tolist()
+    )
+
+    prefetch_limit = max(top_k * 2, 10)
+    search_result = client.query_points(
+        collection_name=_collection_name(),
+        prefetch=[
+            Prefetch(query=query_dense.tolist(), using="dense", limit=prefetch_limit),
+            Prefetch(query=query_sparse, using="sparse", limit=prefetch_limit),
+        ],
+        query=FusionQuery(fusion=Fusion.RRF),
+        limit=max(top_k * 2, 10),
+    )
+    points = search_result.points if hasattr(search_result, "points") else search_result
+    valid_points = [p for p in points if p is not None and getattr(p, "payload", None) is not None]
+    docs = [(p.payload or {}).get("text", "") for p in valid_points]
+    retrieval_latency_ms = (time.perf_counter() - t_retrieval_start) * 1000
+
+    if not docs:
+        return [], retrieval_latency_ms, 0.0
+
+    t_rerank_start = time.perf_counter()
+    scores = list(cross_encoder.rerank(query, docs))
+    scored_hits = sorted(zip(scores, valid_points), key=lambda x: x[0], reverse=True)
+    rerank_latency_ms = (time.perf_counter() - t_rerank_start) * 1000
+
+    return [p for _, p in scored_hits[:top_k]], round(retrieval_latency_ms, 2), round(rerank_latency_ms, 2)
