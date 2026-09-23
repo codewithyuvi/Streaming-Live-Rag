@@ -17,25 +17,30 @@ try:
 except ImportError:
     pass
 
-FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "openai/gpt-oss-20b")
+import threading
+
+FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "llama-3.1-8b-instant")
 _client = None
+_client_lock = threading.Lock()
 
 
 def get_groq_client():
-    """Lazily initializes and returns the Groq client."""
+    """Lazily initializes and returns the Groq client with thread safety."""
     global _client
     if _client is None:
-        try:
-            from groq import Groq
-        except ImportError:
-            raise ImportError("The 'groq' package is not installed. Please run: pip install groq")
-        api_key = os.getenv("GROQ_API_KEY", "")
-        if not api_key:
-            raise ValueError(
-                "GROQ_API_KEY environment variable is not set. "
-                "Provide a valid Groq API key in your .env file."
-            )
-        _client = Groq(api_key=api_key)
+        with _client_lock:
+            if _client is None:
+                try:
+                    from groq import Groq
+                except ImportError:
+                    raise ImportError("The 'groq' package is not installed. Please run: pip install groq")
+                api_key = os.getenv("GROQ_API_KEY", "")
+                if not api_key:
+                    raise ValueError(
+                        "GROQ_API_KEY environment variable is not set. "
+                        "Provide a valid Groq API key in your .env file."
+                    )
+                _client = Groq(api_key=api_key)
     return _client
 
 

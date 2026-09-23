@@ -10,14 +10,16 @@ from qdrant_client import QdrantClient
 from fastembed import TextEmbedding
 from retrieval.hybrid_search import search as hybrid_search
 
-qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+qdrant_url = os.getenv("QDRANT_URL") or f"http://{os.getenv('QDRANT_HOST', 'localhost')}:{os.getenv('QDRANT_PORT', '6333')}"
+qdrant_client = QdrantClient(url=qdrant_url)
 embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "dev_corpus_dense")
 
 def run_dense_search(query: str, top_k: int = 3):
     start = time.time()
     query_dense = list(embedding_model.embed([query]))[0]
     results = qdrant_client.query_points(
-        collection_name="dev_corpus_dense",
+        collection_name=COLLECTION_NAME,
         query=query_dense.tolist(),
         using="dense",
         limit=top_k

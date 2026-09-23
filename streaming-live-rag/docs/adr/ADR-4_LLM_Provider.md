@@ -3,8 +3,8 @@
 **Status:** Accepted & Implemented (Audited September 23, 2026)
 
 **Decision:** We implement a **Dual-Provider Architecture**:
-1. **Groq (`openai/gpt-oss-20b` / `groq/compound-mini` / `llama-3.1-8b-instant`)** via centralized `llm_config.py`: Handles all latency-sensitive operations (Streaming Controller deciding `trigger_now` / `wait` / `no_retrieval_needed`, Multi-Intent Decomposer, and Session Refinement Classifier).
-2. **Gemini (`gemini-3.8-flash` / `gemini-2.5-flash`)** via official `google-genai` SDK: Handles final Session-Aware Synthesis, complex reasoning, and grounded citation generation.
+1. **Groq (`llama-3.1-8b-instant` / `llama-3.3-70b-versatile`)** via centralized `llm_config.py`: Handles all latency-sensitive operations (Streaming Controller deciding `trigger_now` / `wait` / `no_retrieval_needed`, Multi-Intent Decomposer, and Session Refinement Classifier).
+2. **Gemini (`gemini-2.5-flash` / `gemini-3.8-flash`)** via official `google-genai` SDK: Handles final Session-Aware Synthesis, complex reasoning, and grounded citation generation.
 
 ---
 
@@ -30,8 +30,8 @@ To prevent runtime crashes and handle transient cloud issues during judging:
 
 ### Model Evolution & Fallback Matrix
 - **Decommissioned:** `llama3-8b-8192` (decommissioned by Groq in 2025/2026).
-- **Fast Controller Primary:** `openai/gpt-oss-20b` (fallback: `groq/compound-mini` or `llama-3.1-8b-instant`).
-- **Synthesis Primary:** `gemini-3.8-flash` (fallback: `gemini-2.5-flash`).
+- **Fast Controller Primary:** `llama-3.1-8b-instant` (fallback: `llama-3.3-70b-versatile`).
+- **Synthesis Primary:** `gemini-2.5-flash` (fallback: `gemini-3.8-flash` / `gemini-2.0-flash`).
 
 Both keys (`GROQ_API_KEY` and `GEMINI_API_KEY`) are managed in `.env` and loaded at runtime.
 

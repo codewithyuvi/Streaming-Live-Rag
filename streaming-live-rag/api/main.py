@@ -17,7 +17,6 @@ from telemetry.schema import (
     TokenCost,
     ControllerDecision,
 )
-from google import genai
 from dotenv import load_dotenv
 
 from streaming.stream_simulator import simulate_stream
@@ -38,7 +37,7 @@ app = FastAPI(title="Streaming Live RAG - Live Pipeline")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -49,6 +48,10 @@ _gemini_client = None
 def get_gemini_client():
     global _gemini_client
     if _gemini_client is None:
+        try:
+            from google import genai
+        except ImportError:
+            raise ImportError("The 'google-genai' package is not installed. Please run: pip install google-genai")
         api_key = os.getenv("GEMINI_API_KEY", "")
         if not api_key:
             raise ValueError("GEMINI_API_KEY is not set in environment.")
@@ -56,7 +59,7 @@ def get_gemini_client():
     return _gemini_client
 
 
-SYNTHESIS_MODEL = os.getenv("SYNTHESIS_LLM_MODEL", "gemini-3.8-flash")
+SYNTHESIS_MODEL = os.getenv("SYNTHESIS_LLM_MODEL", "gemini-2.5-flash")
 
 
 @app.get("/health")
@@ -76,9 +79,9 @@ def demo_ui():
 
 
 class TurnRequest(BaseModel):
-    session_id: str = Field(..., max_length=128)
-    turn_id: int
-    utterance: str = Field(..., max_length=1000)
+    session_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-]+$")
+    turn_id: int = Field(..., ge=1, le=10000)
+    utterance: str = Field(..., min_length=1, max_length=1000)
 
 
 class TurnResponse(BaseModel):
@@ -91,11 +94,29 @@ class TurnResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _same_intent(q1: str, q2: str | None) -> bool:
-    """Checks if a decomposed sub-query covers the same intent as the provisional query."""
+    """Checks if a decomposed sub-query covers the same intent as the provisional query.
+
+    Uses token-overlap (Jaccard) instead of raw substring so a truncated
+    provisional prefix does not suppress a needed delta retrieval.
+    """
     if not q2:
         return False
-    s1, s2 = q1.strip().lower(), q2.strip().lower()
-    return s1 == s2 or (len(s1) > 8 and s1 in s2) or (len(s2) > 8 and s2 in s1)
+    import re
+
+    def _toks(s: str) -> set[str]:
+        return set(re.findall(r"[a-z0-9]+", s.strip().lower()))
+
+    t1, t2 = _toks(q1), _toks(q2)
+    if not t1 or not t2:
+        return False
+    if q1.strip().lower() == q2.strip().lower():
+        return True
+    inter = len(t1 & t2)
+    union = len(t1 | t2)
+    jaccard = inter / union if union else 0.0
+    # Same intent only if strong overlap AND provisional covers most of the sub-query (t1)
+    subquery_recall = inter / len(t1) if t1 else 0.0
+    return jaccard >= 0.6 and subquery_recall >= 0.8
 
 
 def _call_gemini_sync(prompt: str):
@@ -210,6 +231,7 @@ async def handle_turn(req: TurnRequest):
             answer_version=session.answer_version,
             latencies_ms=LatenciesMs(
                 refinement=round(refinement_latency, 2),
+                controller=round(refinement_latency, 2),
                 end_to_end=round((time.time() - start_time) * 1000, 2),
             ),
         )
@@ -265,6 +287,7 @@ async def handle_turn(req: TurnRequest):
                 citations=[],
                 answer_version=session.answer_version,
                 latencies_ms=LatenciesMs(
+                    controller=round((time.time() - start_time) * 1000, 2),
                     end_to_end=round((time.time() - start_time) * 1000, 2),
                 ),
             )
@@ -310,9 +333,13 @@ async def handle_turn(req: TurnRequest):
     ]
 
     retrieval_start = time.time()
-    delta_tasks = [asyncio.to_thread(retrieve_and_rerank, q, q, 5) for q in todo]
-    delta_hits = await asyncio.gather(*delta_tasks) if delta_tasks else []
-    prov_hits = (await provisional[1]) if provisional else []
+    try:
+        delta_tasks = [asyncio.to_thread(retrieve_and_rerank, q, q, 5) for q in todo]
+        delta_hits = await asyncio.gather(*delta_tasks) if delta_tasks else []
+        prov_hits = (await provisional[1]) if provisional else []
+    except Exception as e:
+        delta_hits = []
+        prov_hits = []
     retrieval_latency = (time.time() - retrieval_start) * 1000
 
     # Build per-subquery results structure for merging
@@ -448,10 +475,13 @@ Provide a clear, well-cited answer.
         token_cost = TokenCost(
             input=in_tok,
             output=out_tok,
-            usd_estimate=round(in_tok * 0.075 / 1e6 + out_tok * 0.30 / 1e6, 6)
+            usd_estimate=round(in_tok * 0.075 / 1e6 + out_tok * 0.30 / 1e6, 6),
+            synthesis_input_tokens=in_tok,
+            synthesis_output_tokens=out_tok,
         )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM Synthesis error: {str(e)}")
+    except Exception:
+        # Never leak provider internals / keys to API callers.
+        raise HTTPException(status_code=502, detail="LLM Synthesis error: upstream provider unavailable")
 
     ttft = (time.time() - llm_start) * 1000
 
@@ -520,6 +550,9 @@ Provide a clear, well-cited answer.
             grounding=round(grounding_latency, 2),
             time_to_first_token=round(ttft, 2),
             end_to_end=round(total_latency, 2),
+            controller=round(refinement_latency + decompose_latency, 2),
+            synthesis=round(ttft, 2),
+            retrieval_pipeline=round(retrieval_latency, 2),
         ),
         token_cost=token_cost,
     )

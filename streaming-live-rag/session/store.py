@@ -128,29 +128,58 @@ class Session:
 
 
 # ---------------------------------------------------------------------------
-# Global ephemeral session store
+# Global ephemeral session store (thread-safe, TTL-evicted)
 # ---------------------------------------------------------------------------
 
+import threading as _threading
+import time as _time
+
 _sessions: dict[str, Session] = {}
+_sessions_lock = _threading.Lock()
+_sessions_last_access: dict[str, float] = {}
+_SESSION_TTL_S = 3600.0  # evict idle sessions after 1h
+_MAX_SESSIONS = 1000
+
+
+def _evict_expired_locked(now: float | None = None) -> None:
+    now = now if now is not None else _time.time()
+    expired = [k for k, ts in _sessions_last_access.items() if now - ts > _SESSION_TTL_S]
+    for k in expired:
+        _sessions.pop(k, None)
+        _sessions_last_access.pop(k, None)
+    # Hard cap: drop oldest if over limit
+    if len(_sessions) > _MAX_SESSIONS:
+        oldest = sorted(_sessions_last_access.items(), key=lambda kv: kv[1])
+        for k, _ in oldest[: len(_sessions) - _MAX_SESSIONS]:
+            _sessions.pop(k, None)
+            _sessions_last_access.pop(k, None)
 
 
 def get_or_create_session(session_id: str) -> Session:
     """Get existing session or create a new one."""
-    if session_id not in _sessions:
-        _sessions[session_id] = Session(session_id=session_id)
-    return _sessions[session_id]
+    with _sessions_lock:
+        _evict_expired_locked()
+        if session_id not in _sessions:
+            _sessions[session_id] = Session(session_id=session_id)
+        _sessions_last_access[session_id] = _time.time()
+        return _sessions[session_id]
 
 
 def delete_session(session_id: str) -> bool:
     """Delete a session. Returns True if it existed."""
-    return _sessions.pop(session_id, None) is not None
+    with _sessions_lock:
+        _sessions_last_access.pop(session_id, None)
+        return _sessions.pop(session_id, None) is not None
 
 
 def list_sessions() -> list[str]:
     """List all active session IDs."""
-    return list(_sessions.keys())
+    with _sessions_lock:
+        return list(_sessions.keys())
 
 
 def reset_store():
     """Clears all sessions (useful for tests)."""
-    _sessions.clear()
+    with _sessions_lock:
+        _sessions.clear()
+        _sessions_last_access.clear()

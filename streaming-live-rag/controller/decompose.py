@@ -100,7 +100,15 @@ Examples:
                     "intent": str(sq.get("intent", "sub_intent")).strip()
                 })
 
-        # If decomposer returned nothing but there's real content (>2 words and not pure greeting), use original
+        # If decomposer explicitly returned an empty list (Rule 6: chit-chat/greeting),
+        # respect it rather than forcing a fallback search query
+        if not validated and isinstance(sub_queries, list) and len(sub_queries) == 0:
+            q_words = {"what", "when", "where", "who", "why", "how", "which"}
+            first_words = set(utterance.lower().split()[:3])
+            if not (first_words & q_words):
+                return []
+            return [{"sub_query": utterance, "intent": "single"}]
+
         if not validated and len(utterance.split()) > 2:
             return [{"sub_query": utterance, "intent": "single"}]
 

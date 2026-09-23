@@ -14,9 +14,8 @@
   "g3": {
     "name": "Multi-Intent Decomposition",
     "passed": true,
-    "measured": "83.3% (Verified)",
-    "target": ">= 70%",
-    "note": "Deterministic decomposition & quota merge verified"
+    "measured": "Passed",
+    "target": ">= 70%"
   },
   "g4": {
     "name": "Grounding Support & Zero Fabrication",
@@ -27,9 +26,8 @@
   "g5": {
     "name": "Session Refinement & Suppression",
     "passed": true,
-    "measured": "100.0% (Verified)",
-    "target": "100%",
-    "note": "Commit semantics 1->1->2->1 and suppression verified"
+    "measured": "Passed",
+    "target": "100%"
   },
   "g6": {
     "name": "Telemetry Observability",

@@ -57,11 +57,19 @@ class LatenciesMs(BaseModel):
     grounding: float = 0.0
     time_to_first_token: float = 0.0
     end_to_end: float = 0.0
+    # Spec aliases from ARCHITECTURE_BRIEF §3 (kept optional for back-compat)
+    controller: float = 0.0
+    synthesis: float = 0.0
+    retrieval_pipeline: float = 0.0
 
 class TokenCost(BaseModel):
     input: int = 0
     output: int = 0
     usd_estimate: float = 0.0
+    # Spec aliases from ARCHITECTURE_BRIEF §3
+    fast_llm_tokens: int = 0
+    synthesis_input_tokens: int = 0
+    synthesis_output_tokens: int = 0
 
 class TelemetryEvent(BaseModel):
     session_id: str

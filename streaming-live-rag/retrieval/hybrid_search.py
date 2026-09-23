@@ -1,4 +1,4 @@
-﻿import os
+import os
 import time
 from typing import List, Tuple, Any
 from qdrant_client import QdrantClient
@@ -21,7 +21,8 @@ _reranker: TextCrossEncoder | None = None
 def get_qdrant_client() -> QdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
-        _qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+        qdrant_url = os.getenv("QDRANT_URL") or f"http://{os.getenv('QDRANT_HOST', 'localhost')}:{os.getenv('QDRANT_PORT', '6333')}"
+        _qdrant_client = QdrantClient(url=qdrant_url)
     return _qdrant_client
 
 
@@ -58,33 +59,38 @@ def retrieve_and_rerank(query: str, rerank_against: str | None = None, top_k: in
 
     rerank_query = rerank_against or query
 
-    # Use query_embed instead of document embed
-    query_dense = next(iter(emb_model.query_embed([query])))
-    query_sparse_obj = next(iter(sparse_model.query_embed([query])))
-    query_sparse = SparseVector(
-        indices=query_sparse_obj.indices.tolist(),
-        values=query_sparse_obj.values.tolist()
-    )
+    try:
+        # Use query_embed instead of document embed
+        query_dense = next(iter(emb_model.query_embed([query])))
+        query_sparse_obj = next(iter(sparse_model.query_embed([query])))
+        query_sparse = SparseVector(
+            indices=query_sparse_obj.indices.tolist(),
+            values=query_sparse_obj.values.tolist()
+        )
 
-    search_result = client.query_points(
-        collection_name=COLLECTION_NAME,
-        prefetch=[
-            Prefetch(query=query_dense.tolist(), using="dense", limit=10),
-            Prefetch(query=query_sparse, using="sparse", limit=10),
-        ],
-        query=FusionQuery(fusion=Fusion.RRF),
-        limit=max(top_k * 2, 10),
-    )
+        search_result = client.query_points(
+            collection_name=COLLECTION_NAME,
+            prefetch=[
+                Prefetch(query=query_dense.tolist(), using="dense", limit=10),
+                Prefetch(query=query_sparse, using="sparse", limit=10),
+            ],
+            query=FusionQuery(fusion=Fusion.RRF),
+            limit=max(top_k * 2, 10),
+        )
 
-    points = search_result.points if hasattr(search_result, "points") else search_result
-    docs = [hit.payload.get("text", "") for hit in points]
+        points = search_result.points if hasattr(search_result, "points") else search_result
+        docs = [hit.payload.get("text", "") for hit in points if hit and hasattr(hit, "payload")]
 
-    if not docs:
+        if not docs:
+            return []
+
+        scores = list(cross_encoder.rerank(rerank_query, docs))
+        scored_hits = sorted(zip(scores, points), key=lambda x: x[0], reverse=True)
+        return scored_hits[:top_k]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Vector search failed for query '{query}': {e}")
         return []
-
-    scores = list(cross_encoder.rerank(rerank_query, docs))
-    scored_hits = sorted(zip(scores, points), key=lambda x: x[0], reverse=True)
-    return scored_hits[:top_k]
 
 
 def search(query: str, top_k: int = 3) -> Tuple[List[Any], float, float]:

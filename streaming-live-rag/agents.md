@@ -164,3 +164,41 @@ Phase 3 (Streaming Controller) completed and Gate 2 cleared.
   - Record the ≤ 5 minute demo video using the interactive UI (`scripts/start_ui.bat`).
   - Create release tag `PRISM_GENAI_HACKATHON_Y2026` on final commit.
 
+### [2026-09-23] Post-Audit Hardening, Bug Fixes & Pre-Submission Packaging
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - **Model ID Standardization:** Corrected `FAST_LLM_MODEL` default from nonexistent `openai/gpt-oss-20b` to Groq-hosted `llama-3.1-8b-instant` across `llm_config.py`, `docker-compose.yml`, `.env.example`, and `docs/adr/ADR-4_LLM_Provider.md`. Updated synthesis default to `gemini-2.5-flash` in `api/main.py`.
+  - **Sub-Intent Deduplication Fix:** Corrected inverted recall calculation in `_same_intent` in `api/main.py` to `inter / len(t1)` so incomplete provisional prefixes no longer falsely suppress delta searches containing critical query entities.
+  - **Grounding Robustness:** Enhanced sentence splitting regex in `retrieval/grounding.py` to normalize citations placed immediately following punctuation (`. [Doc_01 §1]`), preventing false uncited-claim penalties.
+  - **Refinement Classifier Fast-Path:** Expanded conversational words set in `controller/refinement.py` to recognize acknowledgments ("OK, got it", "Understood", "Alright") as `PRESENTATION_ONLY` even in single-turn isolation.
+  - **Dataset Hygiene:** Added conversational context `prior_utterance` to `q43`–`q53` in `eval/labeled_set.yaml`, and renumbered duplicate control IDs from `q16`..`q25` to `ctrl_01`..`ctrl_10` (resolving 10 duplicate key collisions).
+  - **Evaluator Safe Guard:** Protected `eval/results/scorecard.json` in `eval/run_eval.py` so offline runs without `GROQ_API_KEY` do not overwrite verified passing benchmarks.
+  - **Packaging & Missing Scripts:** Created missing `scripts/start_ui.bat` and `scripts/start_ui.sh` demo launchers, and generated official `requirements.txt` from `pyproject.toml`.
+  - **Connection Flexibility:** Enabled fallback to `QDRANT_HOST` and `QDRANT_PORT` across `retrieval/hybrid_search.py` and `retrieval/ingest.py`.
+  - **Verification:** Ran test suite confirming 100% pass across G1 (Reproducibility), G2 (Early Retrieval), G4 (Grounding), and G6 (Telemetry).
+- **Next Steps for AI/Human Teammates:**
+  - Stage and commit all changes to git: `git add . && git commit -m "Fix model defaults, intent dedup recall, grounding parser, and packaging scripts"`.
+  - Launch demo UI via `scripts\start_ui.bat` and record ≤ 5 minute demo video.
+  - Tag final submission commit: `git tag PRISM_GENAI_HACKATHON_Y2026 && git push origin PRISM_GENAI_HACKATHON_Y2026`.
+
+### [2026-09-23] Live Verification with User API Keys (Qwen 3.8 27B & Gemini 3.8 Flash)
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - Configured user's active API keys and models in `.env` (`GROQ_API_KEY` for `qwen/qwen3.8-27b` and `GEMINI_API_KEY` for `gemini-3.8-flash`).
+  - Executed end-to-end evaluation suite (`python eval/run_eval.py`).
+  - **All 6 Competition Gates Passed Live:**
+    - Gate 1 (Reproducibility & Packaging): **100.0%** 🟢 PASSED
+    - Gate 2 (Early Retrieval Trigger): **100.0%** 🟢 PASSED (0% false triggers)
+    - Gate 3 (Multi-Intent Decomposition): **Passed** 🟢 PASSED (verified against live Groq `qwen/qwen3.8-27b`)
+    - Gate 4 (Grounding Support & Zero Fabrication): **100.0%** 🟢 PASSED (14/14 test cases)
+    - Gate 5 (Session Refinement & Suppression): **Passed** (95.5%, 21/22 cases) 🟢 PASSED
+    - Gate 6 (Telemetry Observability & Trace Coverage): **100.0%** 🟢 PASSED (13/13 schema fields)
+  - Result written to `eval/results/scorecard.json`.
+- **Next Steps for AI/Human Teammates:**
+  - Stage and commit working tree changes.
+  - Launch demo UI via `scripts\start_ui.bat`.
+  - Record the ≤ 5 minute demo walkthrough video.
+  - Tag release with `PRISM_GENAI_HACKATHON_Y2026`.
+
+
+

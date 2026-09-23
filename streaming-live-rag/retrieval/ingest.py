@@ -1,4 +1,4 @@
-﻿import os
+import os
 import glob
 import logging
 from fastembed import TextEmbedding, SparseTextEmbedding
@@ -86,15 +86,22 @@ def ingest():
     print("Generating sparse embeddings...")
     sparse_embeddings = list(sparse_embedding_model.embed(texts))
 
-    # Initialize Qdrant Client
-    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
+    qdrant_url = os.getenv("QDRANT_URL") or f"http://{os.getenv('QDRANT_HOST', 'localhost')}:{os.getenv('QDRANT_PORT', '6333')}"
     client = QdrantClient(url=qdrant_url)
     
     collection_name = COLLECTION_NAME
     
-    # Idempotent collection creation
+    # Idempotent collection check
+    force_reindex = os.getenv("FORCE_REINDEX", "false").lower() in ("true", "1")
     if client.collection_exists(collection_name):
-        print(f"Collection '{collection_name}' exists. Recreating it to ensure clean state...")
+        try:
+            count = client.count(collection_name).count
+            if count > 0 and not force_reindex:
+                print(f"Collection '{collection_name}' already exists with {count} points. Skipping ingestion. (Set FORCE_REINDEX=true to recreate)")
+                return
+        except Exception:
+            pass
+        print(f"Recreating collection '{collection_name}' to ensure clean state...")
         client.delete_collection(collection_name)
         
     client.create_collection(

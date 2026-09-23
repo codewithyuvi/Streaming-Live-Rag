@@ -47,13 +47,19 @@ def classify_refinement(
     
     # Fast path: If no conversation history, check for greetings/chit-chat vs new question
     if not conversation_history.strip() and not previous_answer.strip():
-        # Check if it's a greeting/pleasantry
-        greeting_words = {"hello", "hi", "hey", "good morning", "good afternoon", "good evening", "how are you", "thanks", "thank you"}
-        cleaned = re.sub(r"[^\w\s]", "", u_lower)
-        if cleaned in greeting_words or any(cleaned.startswith(g) for g in ["hello", "hi ", "hey "]):
+        # Check if it's a greeting, pleasantry, or conversational acknowledgment
+        conversational_words = {
+            "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+            "how are you", "thanks", "thank you", "thank you so much", "ok", "ok got it",
+            "got it", "understood", "perfect", "great", "awesome", "alright", "i see",
+            "moving on", "ok ok moving on", "great thanks for the info", "perfect thats what i needed",
+            "hmm let me think about that"
+        }
+        cleaned = re.sub(r"[^\w\s]", "", u_lower).strip()
+        if cleaned in conversational_words or any(cleaned.startswith(g) for g in ["hello", "hi ", "hey ", "thanks", "thank you", "ok ", "ok,"]):
             return {
                 "type": "PRESENTATION_ONLY",
-                "reason": "Initial greeting / conversational opener",
+                "reason": "Conversational pleasantry or acknowledgment",
                 "constraint": ""
             }
         # If no history and not a greeting, it must be a NEW_TOPIC

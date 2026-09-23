@@ -60,36 +60,36 @@ queries:
     expected_doc: "Doc_02"
   
   # Single Simple Question Controls (Added for Phase 3/4)
-  - id: q16
+  - id: ctrl_01
     utterance: "What is the cancellation policy for Pune?"
     expected_doc: "Doc_01"
-  - id: q17
+  - id: ctrl_02
     utterance: "Who handles the projector setup?"
     expected_doc: "Doc_01"
-  - id: q18
+  - id: ctrl_03
     utterance: "Are international flights allowed in economy?"
     expected_doc: "Doc_02"
-  - id: q19
+  - id: ctrl_04
     utterance: "What is the hotel allowance?"
     expected_doc: "Doc_02"
-  - id: q20
+  - id: ctrl_05
     utterance: "Where is the Pune venue located?"
     expected_doc: null # not in corpus
     
   # Presentation-only / Conversational (Should NOT trigger retrieval)
-  - id: q21
+  - id: ctrl_06
     utterance: "Let me pull up my slides."
     expected_doc: null
-  - id: q22
+  - id: ctrl_07
     utterance: "Can everyone see my screen ok?"
     expected_doc: null
-  - id: q23
+  - id: ctrl_08
     utterance: "Moving on to the next topic."
     expected_doc: null
-  - id: q24
+  - id: ctrl_09
     utterance: "Thanks for joining the call today."
     expected_doc: null
-  - id: q25
+  - id: ctrl_10
     utterance: "I'll take questions at the end."
     expected_doc: null
 
@@ -260,53 +260,64 @@ queries:
     utterance: "OK, got it."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q44
     utterance: "Thanks!"
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q45
     utterance: "Thank you so much."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q46
     utterance: "Perfect, that's what I needed."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q47
     utterance: "Understood."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q48
     utterance: "Great, thanks for the info."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q49
     utterance: "Hmm, let me think about that."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q50
     utterance: "I see."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q51
     utterance: "Awesome!"
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q52
     utterance: "Alright."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
 
   - id: q53
     utterance: "OK OK, moving on."
     expected_doc: null
     refinement_type: "PRESENTATION_ONLY"
+    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"

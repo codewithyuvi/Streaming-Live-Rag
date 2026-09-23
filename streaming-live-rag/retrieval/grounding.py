@@ -1,4 +1,4 @@
-﻿"""
+"""
 Phase 5 — Claim-Level Deterministic Grounding Validator (ADR-5 / C5 / C6).
 Tested against edge cases T1-T10 in Appendix B.1 of the audit report.
 """
@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 
 BRACKET = re.compile(r"[\[(]([^\[\]()]*?Doc_\d+[^\[\]()]*?)[\])]")  # [..] or (..) containing a Doc_ mention
-ONE_TAG = re.compile(r"Doc_(\d+)\s*(?:§\s*([\w.]+))?", re.I)         # Doc_01 §1 | Doc_01§1 | Doc_01
+ONE_TAG = re.compile(r"Doc_(\d+)\s*(?:§\s*([\w.\-]+))?", re.I)         # Doc_01 §1 | Doc_01 §A-1 | Doc_01§1 | Doc_01
 ABSTAIN = re.compile(
     r"\b(not (?:available|found|mentioned|specified|covered|included)"
     r"|no (?:relevant )?information (?:is |was )?(?:available|found|provided)"
@@ -100,7 +100,11 @@ def validate(answer: str, retrieved_tags: list[str]) -> Report:
     r = Report(cited=list(dict.fromkeys(tags_in(answer))))
     r.fabricated = [t for t in r.cited if t not in avail]
 
-    for s in re.split(r"(?<=[.!?])\s+", answer.strip()):
+    # Normalize: if punctuation precedes bracket citation (e.g. "claim. [Doc_01 §1]"),
+    # move punctuation to end of citation tag so it attaches to its claim sentence
+    normalized = re.sub(r"([.!?])\s*([\[(][^\[\]()]*Doc_\d+[^\[\]()]*[\])])", r" \2\1", answer.strip())
+
+    for s in re.split(r"(?<=[.!?])\s+(?![\[(]\s*Doc_)", normalized):
         if len(s.split()) < 4:
             continue  # fragments / greetings are not claims
         if ABSTAIN.search(s):

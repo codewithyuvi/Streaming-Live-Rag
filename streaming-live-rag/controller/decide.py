@@ -63,8 +63,14 @@ def decide_retrieval(partial_utterance: str) -> dict:
     
     try:
         decision = json.loads(response.choices[0].message.content)
-        if decision.get("trigger") not in ["wait", "retrieve_now", "no_retrieval_needed"]:
-            decision["trigger"] = "wait"
+        trigger = decision.get("trigger")
+        # Normalize spec alias: ARCHITECTURE_BRIEF uses `trigger_now`,
+        # runtime historically used `retrieve_now`. Accept both.
+        if trigger == "trigger_now":
+            trigger = "retrieve_now"
+        if trigger not in ["wait", "retrieve_now", "no_retrieval_needed"]:
+            trigger = "wait"
+        decision["trigger"] = trigger
         return decision
     except Exception as e:
         return {"trigger": "wait", "reason": f"Fallback due to parse error: {str(e)}", "degraded": True}
