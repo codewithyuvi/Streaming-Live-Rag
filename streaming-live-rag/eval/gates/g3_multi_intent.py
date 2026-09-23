@@ -12,7 +12,6 @@ Target: G3 ≥ 70% on compound cases, low over-fragmentation on singles.
 
 import os
 import sys
-import sys
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")

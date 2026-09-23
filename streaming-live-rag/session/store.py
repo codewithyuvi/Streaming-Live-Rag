@@ -1,4 +1,4 @@
-﻿"""
+"""
 session/store.py — Ephemeral Session Store with Clean Commit Semantics (C4 / C7 / M1 / Appendix B.3).
 
 Tracks:
@@ -8,8 +8,10 @@ Tracks:
 - Non-corrupting PRESENTATION_ONLY audit tracking
 """
 
+import threading as _threading
+import time as _time
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 
 @dataclass
@@ -130,9 +132,6 @@ class Session:
 # ---------------------------------------------------------------------------
 # Global ephemeral session store (thread-safe, TTL-evicted)
 # ---------------------------------------------------------------------------
-
-import threading as _threading
-import time as _time
 
 _sessions: dict[str, Session] = {}
 _sessions_lock = _threading.Lock()

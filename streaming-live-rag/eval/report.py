@@ -1,4 +1,4 @@
-﻿"""
+"""
 eval/report.py — Formats and prints the final Judge's Benchmark Scorecard (G1 to G6).
 """
 
@@ -30,7 +30,6 @@ def print_scorecard(results: dict):
     all_passed = True
     for gid, desc, target, key in gates_meta:
         gate_res = results.get(key, {})
-        status = "PASSED" if gate_res.get("passed", False) else "FAILED"
         status_icon = "🟢 PASS" if gate_res.get("passed", False) else "🔴 FAIL"
         measured = gate_res.get("measured", "N/A")
         if not gate_res.get("passed", False):

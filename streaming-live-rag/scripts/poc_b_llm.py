@@ -28,7 +28,7 @@ def run_groq_test(prompt: str):
             max_tokens=150
         )
         total_time = (time.time() - start_time) * 1000
-        print(f"[Groq - Fast Controller Task]")
+        print("[Groq - Fast Controller Task]")
         print(f"Response: {response.choices[0].message.content.strip()}")
         print(f"Latency: {total_time:.2f} ms\n")
     except Exception as e:
@@ -41,8 +41,7 @@ def run_gemini_test(prompt: str):
         return
         
     client = genai.Client(api_key=api_key)
-    # Using flash here for the POC, but the app will use pro for synthesis
-    model = "gemini-3.8-flash" 
+    model = os.getenv("SYNTHESIS_LLM_MODEL", "gemini-3.8-flash")
     
     start_time = time.time()
     try:
@@ -51,7 +50,7 @@ def run_gemini_test(prompt: str):
             contents=prompt,
         )
         total_time = (time.time() - start_time) * 1000
-        print(f"[Gemini - Synthesis Task]")
+        print("[Gemini - Synthesis Task]")
         print(f"Response: {response.text.strip()}")
         print(f"Latency: {total_time:.2f} ms\n")
     except Exception as e:

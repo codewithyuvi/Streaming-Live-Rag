@@ -26,7 +26,7 @@ from controller.decompose import decompose_query
 from controller.refinement import classify_refinement
 from retrieval.merge import merge_and_dedup
 from retrieval.grounding import validate
-from session.store import get_or_create_session, Session
+from session.store import get_or_create_session
 from retrieval.hybrid_search import retrieve_and_rerank
 from telemetry.sink import emit
 
@@ -337,7 +337,7 @@ async def handle_turn(req: TurnRequest):
         delta_tasks = [asyncio.to_thread(retrieve_and_rerank, q, q, 5) for q in todo]
         delta_hits = await asyncio.gather(*delta_tasks) if delta_tasks else []
         prov_hits = (await provisional[1]) if provisional else []
-    except Exception as e:
+    except Exception:
         delta_hits = []
         prov_hits = []
     retrieval_latency = (time.time() - retrieval_start) * 1000

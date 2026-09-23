@@ -1,5 +1,4 @@
 import asyncio
-import time
 from qdrant_client import AsyncQdrantClient, models
 
 async def main():

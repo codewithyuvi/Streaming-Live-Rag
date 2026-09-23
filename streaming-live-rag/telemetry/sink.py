@@ -1,8 +1,6 @@
 import os
-import json
-from telemetry.schema import TelemetryEvent
-
 import threading
+from telemetry.schema import TelemetryEvent
 
 # Create logs directory if it doesn't exist
 LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")

@@ -21,9 +21,9 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 try:
-    from llm_config import call_fast, FAST_LLM_MODEL
+    from llm_config import call_fast
 except ImportError:
-    from ..llm_config import call_fast, FAST_LLM_MODEL
+    from ..llm_config import call_fast
 
 MAX_SUB_QUERIES = 4
 

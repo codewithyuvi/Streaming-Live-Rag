@@ -1,4 +1,4 @@
-﻿"""
+"""
 Gate 1 — Reproducibility & Packaging Evaluation (G1).
 
 Validates that the project satisfies the competition packaging rules:
@@ -78,11 +78,11 @@ def evaluate_g1():
     # 4. Clean import check (lazy client initialization, no crash on import)
     try:
         sys.path.insert(0, ROOT_DIR)
-        import llm_config
-        from session.store import Session
-        from retrieval.grounding import validate
-        from retrieval.merge import merge_with_quota
-        from controller.heuristics import is_stable_enough
+        import llm_config  # noqa: F401
+        from session.store import Session  # noqa: F401
+        from retrieval.grounding import validate  # noqa: F401
+        from retrieval.merge import merge_with_quota  # noqa: F401
+        from controller.heuristics import is_stable_enough  # noqa: F401
         checks.append({
             "name": "Clean module imports without hard failure when keys unset",
             "passed": True,
