@@ -28,7 +28,6 @@ def emit(event: TelemetryEvent):
                     open(TELEMETRY_LOG_FILE, "w", encoding="utf-8").close()
             with open(TELEMETRY_LOG_FILE, "a", encoding="utf-8") as f:
                 f.write(event.model_dump_json() + "\n")
-        except OSError as e:
+        except Exception as e:
             import logging
             logging.getLogger(__name__).warning("telemetry sink failed: %s", e)
-            raise

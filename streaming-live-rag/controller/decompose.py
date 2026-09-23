@@ -74,7 +74,7 @@ Examples:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=300
+            max_tokens=500
         )
     except Exception as e:
         # Fallback: treat the whole utterance as a single query and mark degraded

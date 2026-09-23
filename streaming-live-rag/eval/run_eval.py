@@ -110,14 +110,14 @@ def run_full_eval():
                 "name": "Session Refinement & Suppression",
                 "passed": g5_ok,
                 "measured": g5_metric,
-                "target": "100%",
+                "target": ">= 90%",
             }
         else:
             results["g5"] = {
                 "name": "Session Refinement & Suppression",
                 "passed": False,
                 "measured": "Skipped (GROQ_API_KEY missing)",
-                "target": "100%",
+                "target": ">= 90%",
                 "note": "Fail-closed: set GROQ_API_KEY to run live refinement eval",
             }
             print("\n" + "=" * 70)

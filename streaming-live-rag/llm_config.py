@@ -65,16 +65,29 @@ PROVIDER_PRESETS = {
 
 _config_lock = threading.RLock()
 
+_fast_prov = os.getenv("FAST_LLM_PROVIDER", "groq").strip().lower()
+if _fast_prov not in PROVIDER_PRESETS:
+    logger.warning("Unsupported FAST_LLM_PROVIDER '%s'; falling back to 'groq'", _fast_prov)
+    _fast_prov = "groq"
+elif _fast_prov == "gemini":
+    logger.warning("Gemini cannot be FAST_LLM_PROVIDER; falling back to 'groq'")
+    _fast_prov = "groq"
+
+_synth_prov = os.getenv("SYNTHESIS_LLM_PROVIDER", "gemini").strip().lower()
+if _synth_prov not in PROVIDER_PRESETS:
+    logger.warning("Unsupported SYNTHESIS_LLM_PROVIDER '%s'; falling back to 'gemini'", _synth_prov)
+    _synth_prov = "gemini"
+
 _current_config: Dict[str, Any] = {
-    "fast_provider": os.getenv("FAST_LLM_PROVIDER", "groq").lower(),
+    "fast_provider": _fast_prov,
     "fast_api_key": os.getenv("GROQ_API_KEY", ""),
-    "fast_base_url": os.getenv("FAST_LLM_BASE_URL", "https://api.groq.com/openai/v1"),
-    "fast_model": os.getenv("FAST_LLM_MODEL", "llama-3.1-8b-instant"),
+    "fast_base_url": os.getenv("FAST_LLM_BASE_URL", PROVIDER_PRESETS[_fast_prov]["base_url"]),
+    "fast_model": os.getenv("FAST_LLM_MODEL", PROVIDER_PRESETS[_fast_prov]["default_fast_model"]),
     
-    "synthesis_provider": os.getenv("SYNTHESIS_LLM_PROVIDER", "gemini").lower(),
+    "synthesis_provider": _synth_prov,
     "synthesis_api_key": os.getenv("GEMINI_API_KEY", ""),
-    "synthesis_base_url": os.getenv("SYNTHESIS_LLM_BASE_URL", ""),
-    "synthesis_model": os.getenv("SYNTHESIS_LLM_MODEL", "gemini-2.5-flash"),
+    "synthesis_base_url": os.getenv("SYNTHESIS_LLM_BASE_URL", PROVIDER_PRESETS[_synth_prov]["base_url"]),
+    "synthesis_model": os.getenv("SYNTHESIS_LLM_MODEL", PROVIDER_PRESETS[_synth_prov]["default_synthesis_model"]),
 }
 
 # Cached client instances
@@ -136,20 +149,30 @@ def update_llm_config(updates: Dict[str, Any]) -> Dict[str, Any]:
         # Check fast provider restrictions
         if "fast_provider" in updates and updates["fast_provider"] is not None:
             new_fp = str(updates["fast_provider"]).strip().lower()
+            if new_fp not in PROVIDER_PRESETS:
+                raise ValueError(f"Unsupported fast provider '{new_fp}'. Supported providers: {sorted(PROVIDER_PRESETS.keys())}")
             if new_fp == "gemini":
                 raise ValueError("Gemini is not supported as the fast streaming controller tier; use Groq, Ollama, NVIDIA, or OpenAI.")
             old_fp = _current_config["fast_provider"]
             _current_config["fast_provider"] = new_fp
-            # Reconcile model if provider changed and no explicit model provided
-            if new_fp != old_fp and "fast_model" not in updates:
-                _current_config["fast_model"] = PROVIDER_PRESETS.get(new_fp, {}).get("model", _current_config["fast_model"])
+            # Reconcile model and base_url if provider changed and no explicit model/base_url provided
+            if new_fp != old_fp:
+                if "fast_model" not in updates:
+                    _current_config["fast_model"] = PROVIDER_PRESETS[new_fp].get("default_fast_model", _current_config["fast_model"])
+                if "fast_base_url" not in updates:
+                    _current_config["fast_base_url"] = PROVIDER_PRESETS[new_fp].get("base_url", _current_config["fast_base_url"])
 
         if "synthesis_provider" in updates and updates["synthesis_provider"] is not None:
             new_sp = str(updates["synthesis_provider"]).strip().lower()
+            if new_sp not in PROVIDER_PRESETS:
+                raise ValueError(f"Unsupported synthesis provider '{new_sp}'. Supported providers: {sorted(PROVIDER_PRESETS.keys())}")
             old_sp = _current_config["synthesis_provider"]
             _current_config["synthesis_provider"] = new_sp
-            if new_sp != old_sp and "synthesis_model" not in updates:
-                _current_config["synthesis_model"] = PROVIDER_PRESETS.get(new_sp, {}).get("model", _current_config["synthesis_model"])
+            if new_sp != old_sp:
+                if "synthesis_model" not in updates:
+                    _current_config["synthesis_model"] = PROVIDER_PRESETS[new_sp].get("default_synthesis_model", _current_config["synthesis_model"])
+                if "synthesis_base_url" not in updates:
+                    _current_config["synthesis_base_url"] = PROVIDER_PRESETS[new_sp].get("base_url", _current_config["synthesis_base_url"])
 
         for k in (
             "fast_api_key", "fast_base_url", "fast_model",

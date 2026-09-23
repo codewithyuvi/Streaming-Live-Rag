@@ -106,8 +106,8 @@ def main():
 
             turn_id += 1
 
-        except KeyboardInterrupt:
-            print("\nExiting live console.")
+        except (KeyboardInterrupt, EOFError):
+            print("\nExiting live console. Goodbye!")
             break
         except Exception as e:
             print(f"[!] Request error: {e}")

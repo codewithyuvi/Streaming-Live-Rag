@@ -3,9 +3,9 @@ retrieval/parsers.py — Universal Document Text Extractor for Streaming Live RA
 
 Supports:
   - PDF (.pdf) via pypdf
-  - Word (.docx, .doc) via python-docx
-  - PowerPoint (.pptx, .ppt) via python-pptx
-  - Excel (.xlsx, .xls) via openpyxl
+  - Word (.docx) via python-docx (legacy .doc not supported)
+  - PowerPoint (.pptx) via python-pptx (legacy .ppt not supported)
+  - Excel (.xlsx) via openpyxl (legacy .xls not supported)
   - CSV / TSV (.csv, .tsv) via standard csv
   - JSON / JSONL (.json, .jsonl) via standard json
   - YAML (.yaml, .yml) via pyyaml
@@ -240,40 +240,91 @@ def extract_txt_md(data: bytes) -> List[str]:
     return combined if combined else [text]
 
 
+def _slice_long_unit(unit: str, max_chars: int, overlap: int) -> List[str]:
+    """Slices a single unit that exceeds max_chars using newline, word, or character boundaries."""
+    if len(unit) <= max_chars:
+        return [unit]
+
+    # Try splitting by newline
+    if "\n" in unit:
+        lines = [line.strip() for line in unit.split("\n") if line.strip()]
+        if len(lines) > 1:
+            res = []
+            for line in lines:
+                res.extend(_slice_long_unit(line, max_chars, overlap))
+            return res
+
+    # Try splitting by whitespace (words)
+    words = unit.split()
+    if len(words) > 1:
+        res = []
+        cur = []
+        cur_len = 0
+        for w in words:
+            if cur_len + len(w) + (1 if cur else 0) > max_chars and cur:
+                res.append(" ".join(cur))
+                cur = [w]
+                cur_len = len(w)
+            else:
+                cur.append(w)
+                cur_len += len(w) + (1 if len(cur) > 1 else 0)
+        if cur:
+            res.append(" ".join(cur))
+        final_res = []
+        for c in res:
+            if len(c) > max_chars:
+                final_res.extend(_slice_long_unit(c, max_chars, overlap))
+            else:
+                final_res.append(c)
+        return final_res
+
+    # Hard boundary-less fallback (single token or unsegmented string > max_chars): character slicing
+    step = max(1, max_chars - overlap)
+    return [unit[i : i + max_chars] for i in range(0, len(unit), step)]
+
+
 def _subdivide_text(text: str, max_chars: int = 1200, overlap: int = 100) -> List[str]:
     """
     Subdivides long text blocks on sentence boundaries to enforce a chunk-size ceiling.
+    Falls back to newline, word, or character slicing when sentence boundaries are absent.
     Prevents silent truncation by 512-token models (e.g. bge-small-en-v1.5).
     """
     if len(text) <= max_chars:
         return [text]
 
-    sentences = re.split(r"(?<=[.?!])\s+", text)
+    raw_sentences = re.split(r"(?<=[.?!])\s+", text)
+    units = []
+    for s in raw_sentences:
+        s_clean = s.strip()
+        if not s_clean:
+            continue
+        if len(s_clean) > max_chars:
+            units.extend(_slice_long_unit(s_clean, max_chars, overlap))
+        else:
+            units.append(s_clean)
+
     chunks = []
     current_chunk = []
     current_len = 0
 
-    for sent in sentences:
-        s = sent.strip()
-        if not s:
-            continue
-        if current_len + len(s) > max_chars and current_chunk:
+    for u in units:
+        if current_len + len(u) + (1 if current_chunk else 0) > max_chars and current_chunk:
             chunk_str = " ".join(current_chunk)
             chunks.append(chunk_str)
             # Retain tail for overlap
             overlap_buf = []
             overlap_len = 0
-            for prev_s in reversed(current_chunk):
-                if overlap_len + len(prev_s) <= overlap:
-                    overlap_buf.insert(0, prev_s)
-                    overlap_len += len(prev_s)
+            for prev_u in reversed(current_chunk):
+                if overlap_len + len(prev_u) <= overlap:
+                    overlap_buf.insert(0, prev_u)
+                    overlap_len += len(prev_u)
                 else:
                     break
-            current_chunk = overlap_buf + [s]
-            current_len = sum(len(x) for x in current_chunk) + len(current_chunk)
+            current_chunk = overlap_buf + [u]
+            current_len = sum(len(x) for x in current_chunk) + len(current_chunk) - 1
         else:
-            current_chunk.append(s)
-            current_len += len(s) + 1
+            current_chunk.append(u)
+            current_len += len(u) + (1 if len(current_chunk) > 1 else 0)
 
     if current_chunk:
         chunks.append(" ".join(current_chunk))

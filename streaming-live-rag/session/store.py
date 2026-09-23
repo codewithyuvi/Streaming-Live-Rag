@@ -46,6 +46,7 @@ class Session:
     current_answer: str = ""                               # last substantive answer -- never overwritten by chit-chat
     current_citations: list[str] = field(default_factory=list)
     answer_version: int = 0
+    _next_turn_id: int = 1
 
     def commit(
         self,
@@ -62,7 +63,8 @@ class Session:
         - LATE_DETAIL: Updates answer/query, unions citations, increments version += 1.
         - PRESENTATION_ONLY: Records turn in audit trail only. Current state and version stay untouched.
         """
-        turn_id = len(self.turns) + 1
+        turn_id = self._next_turn_id
+        self._next_turn_id += 1
         record = TurnRecord(
             turn_id=turn_id,
             utterance=utterance,

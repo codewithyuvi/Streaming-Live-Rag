@@ -136,7 +136,7 @@ def search(query: str, top_k: int = 3) -> Tuple[List[Any], float, float]:
     client = get_qdrant_client()
     embedding_model = get_embedding_model()
     sparse_model = get_sparse_embedding_model()
-    cross_encoder = get_cross_encoder()
+    cross_encoder = get_reranker()
 
     t_retrieval_start = time.perf_counter()
     query_dense = next(iter(embedding_model.query_embed([query])))

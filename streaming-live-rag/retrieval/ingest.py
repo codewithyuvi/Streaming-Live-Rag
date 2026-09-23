@@ -208,9 +208,6 @@ def ingest_file_or_text(
     from retrieval.parsers import extract_sections
 
     with _ingest_lock:
-        if reset:
-            clear_corpus()
-
         if content_bytes is None or len(content_bytes) == 0:
             if text_override:
                 content_bytes = text_override.encode("utf-8")
@@ -245,10 +242,33 @@ def ingest_file_or_text(
             except Exception as e:
                 logger.debug("Deduplication scroll check error: %s", e)
 
-        doc_id = get_next_doc_id()
-        sections = extract_sections(filename, content_bytes, doc_id)
+        # R1: Extract sections BEFORE resetting the corpus (protect existing data if parse fails)
+        provisional_doc_id = "Doc_01" if reset else get_next_doc_id()
+        sections = extract_sections(filename, content_bytes, provisional_doc_id)
         if not sections:
-            return {"status": "empty", "chunks_indexed": 0, "tags": [], "doc_id": doc_id}
+            return {"status": "empty", "chunks_indexed": 0, "tags": [], "doc_id": provisional_doc_id}
+
+        corpus_dir = os.path.join(os.path.dirname(__file__), "../data/dev_corpus")
+        if reset:
+            # Parse succeeded; now safe to clear live collection
+            clear_corpus()
+            # R6: Clean up dynamically uploaded copies from dev_corpus on reset
+            try:
+                if os.path.exists(corpus_dir):
+                    for old_f in glob.glob(os.path.join(corpus_dir, "Doc_*_*")):
+                        try:
+                            os.remove(old_f)
+                        except OSError:
+                            pass
+            except Exception as e:
+                logger.warning("Failed to clean up uploaded files on reset: %s", e)
+
+            doc_id = "Doc_01"
+            for sec in sections:
+                sec["doc_id"] = doc_id
+                sec["tag"] = f"{doc_id} §{sec['section']}"
+        else:
+            doc_id = provisional_doc_id
 
         for sec in sections:
             sec["file_hash"] = content_hash
@@ -257,7 +277,6 @@ def ingest_file_or_text(
         result["doc_id"] = doc_id
 
         # Persist a local copy to data/dev_corpus with doc_id namespacing
-        corpus_dir = os.path.join(os.path.dirname(__file__), "../data/dev_corpus")
         try:
             os.makedirs(corpus_dir, exist_ok=True)
             safe_name = f"{doc_id}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', filename)}"
@@ -284,6 +303,9 @@ def parse_corpus(corpus_dir: str):
         filename = os.path.basename(file_path)
         ext = os.path.splitext(filename.lower())[1]
         if ext in (".py", ".pyc"):
+            continue
+        # R7: Skip dynamically persisted upload copies (Doc_XX_*) in batch ingestion
+        if re.match(r"^Doc_\d{2,}_", filename):
             continue
         try:
             with open(file_path, "rb") as f:

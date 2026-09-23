@@ -176,4 +176,97 @@ def test_byok_config_endpoints(monkeypatch):
     assert res_test.json()["fast"]["ok"] is True
 
 
+def test_admin_auth_matrix(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from unittest.mock import MagicMock
+    from api.main import verify_admin_access
+
+    # 1. ADMIN_TOKEN unset, non-loopback request -> 403
+    monkeypatch.setattr("api.main.ADMIN_TOKEN", "")
+    req_remote = MagicMock()
+    req_remote.client.host = "192.168.1.100"
+    with pytest.raises(HTTPException) as exc:
+        verify_admin_access(req_remote)
+    assert exc.value.status_code == 403
+
+    # 2. ADMIN_TOKEN unset, loopback request -> allowed
+    req_local = MagicMock()
+    req_local.client.host = "127.0.0.1"
+    assert verify_admin_access(req_local) is True
+
+    # 3. ADMIN_TOKEN set, missing token -> 401
+    monkeypatch.setattr("api.main.ADMIN_TOKEN", "secret_admin_token")
+    req_unauth = MagicMock()
+    req_unauth.client.host = "127.0.0.1"
+    req_unauth.headers = {}
+    with pytest.raises(HTTPException) as exc:
+        verify_admin_access(req_unauth)
+    assert exc.value.status_code == 401
+
+    # 4. ADMIN_TOKEN set, invalid token -> 401
+    req_bad = MagicMock()
+    req_bad.client.host = "127.0.0.1"
+    req_bad.headers = {"Authorization": "Bearer wrong_token"}
+    with pytest.raises(HTTPException) as exc:
+        verify_admin_access(req_bad)
+    assert exc.value.status_code == 401
+
+    # 5. ADMIN_TOKEN set, valid token via Authorization header -> allowed
+    req_valid_bearer = MagicMock()
+    req_valid_bearer.client.host = "127.0.0.1"
+    req_valid_bearer.headers = {"Authorization": "Bearer secret_admin_token"}
+    assert verify_admin_access(req_valid_bearer) is True
+
+    # 6. ADMIN_TOKEN set, valid token via X-Admin-Token header on remote IP -> allowed
+    req_valid_header = MagicMock()
+    req_valid_header.client.host = "192.168.1.50"
+    req_valid_header.headers = {"X-Admin-Token": "secret_admin_token"}
+    assert verify_admin_access(req_valid_header) is True
+
+
+def test_merge_quota_non_guaranteed():
+    sub1_hits = [(0.9, {"id": 1, "text": "chunk1"}), (0.8, {"id": 2, "text": "chunk2"})]
+    sub2_speculative = [(0.95, {"id": 3, "text": "speculative_chunk3"}), (0.85, {"id": 4, "text": "speculative_chunk4"})]
+    per_sq = [
+        {"sub_query": "sq1", "scored_hits": sub1_hits, "guaranteed": True},
+        {"sub_query": "sq2_spec", "scored_hits": sub2_speculative, "guaranteed": False},
+    ]
+    # With total_k = 3 and min_per_sq = 2:
+    # Stage 1: sq1 takes its 2 guaranteed hits (ids: 1, 2)
+    # Stage 2: remaining 1 slot is taken by highest score from rest (sq2_spec id 3 with score 0.95)
+    merged = merge_with_quota(per_sq, total_k=3, min_per_sq=2)
+    pids = [item["point"]["id"] for item in merged]
+    assert len(merged) == 3
+    assert 1 in pids and 2 in pids and 3 in pids
+
+
+def test_parsers_boundaryless_chunking():
+    from retrieval.parsers import _subdivide_text
+
+    # Unpunctuated stream of words
+    raw_unpunctuated = "word " * 1200  # ~6000 chars
+    chunks = _subdivide_text(raw_unpunctuated, max_chars=1200, overlap=100)
+    assert len(chunks) > 1
+    for c in chunks:
+        assert len(c) <= 1200
+
+    # Unbroken continuous token without whitespace
+    giant_token = "A" * 3500
+    chunks_token = _subdivide_text(giant_token, max_chars=1200, overlap=100)
+    assert len(chunks_token) >= 3
+    for c in chunks_token:
+        assert len(c) <= 1200
+
+
+def test_monotonic_turn_id_beyond_50():
+    sess = get_or_create_session("long_session_test")
+    for i in range(60):
+        rec = sess.commit("NEW_TOPIC", f"q{i}", f"ans{i}", [])
+        assert rec.turn_id == i + 1
+    assert len(sess.turns) == 50
+    assert sess.turns[-1].turn_id == 60
+
+
+
 

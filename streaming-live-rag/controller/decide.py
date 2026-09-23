@@ -56,7 +56,7 @@ def decide_retrieval(partial_utterance: str) -> dict:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=150
+            max_tokens=400
         )
     except Exception as e:
         return {"trigger": "wait", "reason": f"Fallback due to api error: {str(e)}", "degraded": True}

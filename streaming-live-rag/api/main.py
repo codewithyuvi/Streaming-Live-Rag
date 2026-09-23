@@ -126,32 +126,58 @@ def _sanitize_for_prompt(text: str, max_len: int = 2000) -> str:
     """Strip prompt-injection framing from user/session text before LLM use using case-insensitive regex."""
     cleaned = (text or "")[:max_len]
     pattern = re.compile(
-        r"\b(system:|assistant:|ignore\s+(all\s+)?previous|disregard\s+previous|do\s+not\s+cite|do\s+not\s+follow)\b",
+        r"\b(?:system|assistant|developer)\s*:|\b(?:ignore\s+(?:all\s+)?previous|disregard\s+previous|do\s+not\s+cite|do\s+not\s+follow)\b",
         re.IGNORECASE
     )
     cleaned = pattern.sub(" ", cleaned)
     return html.unescape(cleaned).strip()
 
 
+IP_RATE_LIMIT_PER_MINUTE = int(os.getenv("IP_RATE_LIMIT_PER_MINUTE", "300"))
+
+
 def _check_rate_limit(session_id: str, client_ip: str = "127.0.0.1") -> bool:
-    """Per-IP + session rate limiter with backward-compatible key lookup."""
-    key = f"{client_ip}:{session_id}"
+    """
+    Dual-bucket rate limiter:
+    1. Per-(IP, session) bucket: RATE_LIMIT_PER_MINUTE (default 60/min).
+    2. Aggregate per-IP bucket: IP_RATE_LIMIT_PER_MINUTE (default 300/min).
+       Note on shared-NAT/corporate proxies: 300 req/min applies to the shared public egress IP.
+    Sweeps both key types on TTL expiration to prevent memory growth.
+    """
+    pair_key = f"{client_ip}:{session_id}"
+    ip_key = f"ip:{client_ip}"
     now = time.time()
     with _rate_limit_lock:
-        for sid in [s for s, ts in _session_request_times.items() if not ts or now - ts[-1] > _RATE_LIMIT_TTL_S]:
-            _session_request_times.pop(sid, None)
-        timestamps = _session_request_times.get(key)
-        if timestamps is None:
-            timestamps = _session_request_times.get(session_id)
-        if timestamps is None:
-            timestamps = []
-            _session_request_times[key] = timestamps
-        valid = [t for t in timestamps if now - t < 60.0]
-        if len(valid) >= RATE_LIMIT_PER_MINUTE:
-            _session_request_times[key] = valid
+        # TTL eviction sweep for both pair keys and aggregate ip: keys
+        expired_keys = [k for k, ts in _session_request_times.items() if not ts or (now - ts[-1] > _RATE_LIMIT_TTL_S)]
+        for k in expired_keys:
+            _session_request_times.pop(k, None)
+
+        # 1. Check aggregate per-IP bucket
+        ip_timestamps = _session_request_times.setdefault(ip_key, [])
+        valid_ip = [t for t in ip_timestamps if now - t < 60.0]
+        if len(valid_ip) >= IP_RATE_LIMIT_PER_MINUTE:
+            _session_request_times[ip_key] = valid_ip
             return False
-        valid.append(now)
-        _session_request_times[key] = valid
+
+        # 2. Check per-(IP, session) bucket
+        pair_timestamps = _session_request_times.get(pair_key)
+        if pair_timestamps is None:
+            pair_timestamps = _session_request_times.get(session_id)
+        if pair_timestamps is None:
+            pair_timestamps = []
+            _session_request_times[pair_key] = pair_timestamps
+
+        valid_pair = [t for t in pair_timestamps if now - t < 60.0]
+        if len(valid_pair) >= RATE_LIMIT_PER_MINUTE:
+            _session_request_times[pair_key] = valid_pair
+            return False
+
+        # Append timestamp to both buckets
+        valid_ip.append(now)
+        _session_request_times[ip_key] = valid_ip
+        valid_pair.append(now)
+        _session_request_times[pair_key] = valid_pair
         return True
 
 
@@ -208,8 +234,12 @@ async def upload_document(
 
     # Guard against memory-exhaustion / zip-bomb DoS
     content_length = request.headers.get("content-length")
-    if content_length and int(content_length) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail=f"Upload exceeds maximum permitted size of {MAX_UPLOAD_BYTES // (1024*1024)}MB.")
+    if content_length:
+        try:
+            if int(content_length) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail=f"Upload exceeds maximum permitted size of {MAX_UPLOAD_BYTES // (1024*1024)}MB.")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid Content-Length header.")
 
     if file is not None:
         fname = filename or file.filename or "uploaded_document.txt"
@@ -224,6 +254,8 @@ async def upload_document(
     else:
         fname = filename or "custom_notes.txt"
         content_bytes = text.encode("utf-8")
+        if len(content_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"Text exceeds maximum permitted size of {MAX_UPLOAD_BYTES // (1024*1024)}MB.")
 
     if not content_bytes.strip():
         raise HTTPException(status_code=400, detail="Uploaded document is empty.")
@@ -430,12 +462,19 @@ async def handle_turn(req: TurnRequest, request: Request):
                 previous_answer="",
             )
         else:
-            refinement_result = await asyncio.to_thread(
-                classify_refinement,
-                current_utterance=req.utterance,
-                conversation_history=history_context,
-                previous_answer=current_answer_snapshot,
-            )
+            try:
+                refinement_result = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        classify_refinement,
+                        current_utterance=req.utterance,
+                        conversation_history=history_context,
+                        previous_answer=current_answer_snapshot,
+                    ),
+                    timeout=10.0,
+                )
+            except (asyncio.TimeoutError, TimeoutError):
+                logger.warning("refinement classification timed out; falling back to NEW_TOPIC")
+                refinement_result = {"type": "NEW_TOPIC", "reason": "timeout_degraded", "constraint": "", "degraded": True}
         refinement_type = refinement_result.get("type", "NEW_TOPIC")
         refinement_latency = (time.time() - refinement_start) * 1000
         if refinement_result.get("degraded"):
@@ -516,7 +555,14 @@ async def handle_turn(req: TurnRequest, request: Request):
                 continue
 
             t_dec_0 = time.perf_counter()
-            d = await asyncio.to_thread(decide_retrieval, candidate)
+            try:
+                d = await asyncio.wait_for(
+                    asyncio.to_thread(decide_retrieval, candidate),
+                    timeout=10.0,
+                )
+            except (asyncio.TimeoutError, TimeoutError):
+                logger.warning("decide_retrieval timed out for candidate '%s'; falling back to wait", candidate)
+                d = {"trigger": "wait", "reason": "timeout_degraded", "degraded": True}
             controller_decision_latency += (time.perf_counter() - t_dec_0) * 1000
 
             controller_calls += 1
@@ -582,7 +628,14 @@ async def handle_turn(req: TurnRequest, request: Request):
     else:
         effective_query = req.utterance
 
-    sub_query_dicts = await asyncio.to_thread(decompose_query, effective_query)
+    try:
+        sub_query_dicts = await asyncio.wait_for(
+            asyncio.to_thread(decompose_query, effective_query),
+            timeout=15.0,
+        )
+    except (asyncio.TimeoutError, TimeoutError):
+        logger.warning("decompose_query timed out; falling back to single query")
+        sub_query_dicts = [{"sub_query": effective_query, "intent": "timeout_fallback", "degraded": True}]
     decompose_latency = (time.time() - decompose_start) * 1000
     if any(isinstance(sq, dict) and sq.get("degraded") for sq in sub_query_dicts):
         degraded = True
