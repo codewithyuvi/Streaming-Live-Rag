@@ -32,6 +32,7 @@ def _clean_text(text: str) -> str:
     """Normalizes whitespace and removes null bytes."""
     if not text:
         return ""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = text.replace("\x00", " ")
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -207,20 +208,24 @@ def extract_rtf(data: bytes) -> List[str]:
         raise ValueError(f"Failed to parse RTF document: {e}") from e
 
 
-def extract_txt_md(data: bytes) -> List[str]:
+def extract_txt_md(data: bytes) -> List[Any]:
     """Extracts paragraphs from plain text or markdown."""
     text = data.decode("utf-8", errors="replace").strip()
     if not text:
         return []
 
+    # Normalize line endings
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
     # Check for pre-tagged format: Doc_XX §Y
     if re.search(r"Doc_\d+\s*§\d+", text):
-        blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
+        blocks = [b.strip() for b in re.split(r"(?=Doc_\d+\s*§\d+)", text) if b.strip()]
         out = []
         for b in blocks:
             lines = b.split("\n", 1)
-            if len(lines) == 2 and "§" in lines[0]:
-                out.append(lines[1].strip())
+            if len(lines) >= 2 and (m := re.search(r"§(\d+)", lines[0])):
+                sec_num = m.group(1)
+                out.append((sec_num, lines[1].strip()))
             else:
                 out.append(b.strip())
         return out
@@ -376,13 +381,18 @@ def extract_sections(filename: str, content: bytes, doc_id: str) -> List[Dict[st
         raw_sections = extract_txt_md(content)
 
     sections = []
-    for idx, txt in enumerate(raw_sections, 1):
-        cleaned = _clean_text(txt)
+    for idx, item in enumerate(raw_sections, 1):
+        if isinstance(item, tuple):
+            explicit_sec_num, raw_txt = item
+        else:
+            explicit_sec_num, raw_txt = str(idx), item
+
+        cleaned = _clean_text(raw_txt)
         if not cleaned:
             continue
         sub_chunks = _subdivide_text(cleaned, max_chars=1200, overlap=100)
         if len(sub_chunks) == 1:
-            sec_num = str(idx)
+            sec_num = explicit_sec_num
             tag = f"{doc_id} §{sec_num}"
             sections.append({
                 "doc_id": doc_id,
@@ -393,7 +403,7 @@ def extract_sections(filename: str, content: bytes, doc_id: str) -> List[Dict[st
             })
         else:
             for sub_idx, sub_txt in enumerate(sub_chunks, 1):
-                sec_num = f"{idx}.{sub_idx}"
+                sec_num = f"{explicit_sec_num}.{sub_idx}"
                 tag = f"{doc_id} §{sec_num}"
                 sections.append({
                     "doc_id": doc_id,

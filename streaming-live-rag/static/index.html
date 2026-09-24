@@ -541,7 +541,7 @@
         fastModel: 'llama-3.1-8b-instant',
         fastBaseUrl: 'https://api.groq.com/openai/v1',
         synthesisProvider: 'gemini',
-        synthesisModel: 'gemini-2.5-flash',
+        synthesisModel: 'gemini-3.5-flash-lite',
         synthesisBaseUrl: '',
       },
       ollama: {
@@ -602,7 +602,7 @@
       const p = document.getElementById('synthesisProvider').value;
       if (p === 'gemini') {
         document.getElementById('synthesisBaseUrl').value = '';
-        document.getElementById('synthesisModel').value = 'gemini-2.5-flash';
+        document.getElementById('synthesisModel').value = 'gemini-3.5-flash-lite';
       } else if (p === 'nvidia') {
         document.getElementById('synthesisBaseUrl').value = 'https://integrate.api.nvidia.com/v1';
         document.getElementById('synthesisModel').value = 'meta/llama-3.3-70b-instruct';

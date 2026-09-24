@@ -183,16 +183,16 @@ def _check_rate_limit(session_id: str, client_ip: str = "127.0.0.1") -> bool:
 
 @app.on_event("startup")
 def _auto_seed_corpus_on_startup():
-    """Ensures dev_corpus documents are indexed on startup if the collection is empty."""
+    """Ensures dev_corpus documents are indexed on startup if the collection is empty or incomplete."""
     try:
         from retrieval.ingest import parse_corpus, ingest_sections, get_corpus_summary
         summary = get_corpus_summary()
-        if summary.get("total_chunks", 0) == 0:
+        if summary.get("total_chunks", 0) < 4:
             corpus_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "dev_corpus"))
             if os.path.exists(corpus_dir):
                 chunks = parse_corpus(corpus_dir)
                 if chunks:
-                    ingest_sections(chunks, reset=False)
+                    ingest_sections(chunks, reset=True)
                     logger.info("Auto-seeded %d corpus chunks on startup into %s.", len(chunks), summary.get("collection"))
     except Exception as e:
         logger.warning("Auto-seed on startup failed: %s", e)
@@ -231,6 +231,22 @@ def clear_all_corpus(_authorized: bool = Depends(verify_admin_access)):
     """Resets the vector collection to empty (Admin authorized)."""
     ok = clear_corpus()
     return {"status": "cleared" if ok else "failed"}
+
+
+@app.post("/corpus/reset")
+@app.post("/corpus/reseed")
+def reset_to_dev_corpus(_authorized: bool = Depends(verify_admin_access)):
+    """Resets the vector collection and re-indexes the default dev_corpus documents (Admin authorized)."""
+    from retrieval.ingest import parse_corpus, ingest_sections
+    clear_corpus()
+    corpus_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "dev_corpus"))
+    chunks = parse_corpus(corpus_dir)
+    res = ingest_sections(chunks, reset=False) if chunks else {"chunks_indexed": 0}
+    return {
+        "status": "reseeded",
+        "chunks_indexed": res.get("chunks_indexed", len(chunks)),
+        "summary": get_corpus_summary(),
+    }
 
 
 @app.post("/upload")
@@ -533,6 +549,7 @@ async def handle_turn(req: TurnRequest, request: Request):
                 sub_queries=[],
                 answer=answer_text,
                 citations=citations,
+                grounding_score=check_report.score if current_answer_snapshot else 1.0,
                 answer_version=answer_version,
                 degraded=bool(refinement_result.get("degraded")),
                 latencies_ms=LatenciesMs(
@@ -609,6 +626,7 @@ async def handle_turn(req: TurnRequest, request: Request):
                     sub_queries=[],
                     answer=answer_text,
                     citations=[],
+                    grounding_score=1.0,
                     answer_version=answer_version,
                     degraded=degraded,
                     latencies_ms=LatenciesMs(
@@ -824,6 +842,7 @@ STRICT INSTRUCTION HIERARCHY & GROUNDING RULES:
 4. If the context does not contain information to answer a question or sub-question, explicitly state:
    "This information is not available in the provided documents."
 5. Never answer from your own knowledge. Only use the provided context.
+6. Do NOT include introductory filler or conversational remarks (such as 'Here are the answers' or 'Let me know'). Output ONLY direct factual statements with their citation tags.
 """
     if refinement_type == "LATE_DETAIL":
         safe_constraint = _sanitize_for_prompt(refinement_result.get('constraint', req.utterance), max_len=500)

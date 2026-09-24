@@ -128,8 +128,11 @@ def validate(answer: str, retrieved_tags: list[str]) -> Report:
         if ABSTAIN.search(s):
             r.abstained = True
             continue  # an abstention sentence is not a claim
+        has_tag = bool(set(tags_in(s)) & avail)
+        if not has_tag and re.search(r"^(?:(?:here|below|following) (?:is|are)|based on (?:the )?(?:provided )?documents?|in summary|to summarize|please (?:note|let me know)|feel free|hope this helps|in conclusion)\b", s.strip(), re.I):
+            continue  # conversational framing / courtesy without assertions is not a domain claim
         r.factual += 1
-        r.supported += bool(set(tags_in(s)) & avail)  # sentence carries >=1 retrievable tag
+        r.supported += has_tag
 
     return r
 

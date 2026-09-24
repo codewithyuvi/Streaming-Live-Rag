@@ -48,8 +48,8 @@ PROVIDER_PRESETS = {
     },
     "gemini": {
         "base_url": "",
-        "default_fast_model": "gemini-3.6-flash",
-        "default_synthesis_model": "gemini-3.6-flash",
+        "default_fast_model": "gemini-3.5-flash-lite",
+        "default_synthesis_model": "gemini-3.5-flash-lite",
     },
     "openai": {
         "base_url": "https://api.openai.com/v1",
@@ -324,11 +324,30 @@ def call_synthesis(prompt: str) -> Dict[str, Any]:
                 # Check if native google-genai or OpenAI wrapper
                 if hasattr(client, "models"):
                     from google.genai import types
-                    res = client.models.generate_content(
-                        model=model,
-                        contents=prompt,
-                        config=types.GenerateContentConfig(temperature=0.0)
-                    )
+                    try:
+                        res = client.models.generate_content(
+                            model=model,
+                            contents=prompt,
+                            config=types.GenerateContentConfig(temperature=0.0)
+                        )
+                    except Exception as ge:
+                        ge_str = str(ge)
+                        if ("429" in ge_str or "RESOURCE_EXHAUSTED" in ge_str) and model != "gemini-3.5-flash-lite":
+                            logger.warning("Gemini model %s hit quota/429; failing over to gemini-3.5-flash-lite", model)
+                            res = client.models.generate_content(
+                                model="gemini-3.5-flash-lite",
+                                contents=prompt,
+                                config=types.GenerateContentConfig(temperature=0.0)
+                            )
+                        elif ("429" in ge_str or "RESOURCE_EXHAUSTED" in ge_str) and model == "gemini-3.5-flash-lite":
+                            logger.warning("Gemini model %s hit quota/429; failing over to gemini-3.6-flash", model)
+                            res = client.models.generate_content(
+                                model="gemini-3.6-flash",
+                                contents=prompt,
+                                config=types.GenerateContentConfig(temperature=0.0)
+                            )
+                        else:
+                            raise
                     txt = (res.text or "").strip()
                     usage = getattr(res, "usage_metadata", None)
                     in_tok = getattr(usage, "prompt_token_count", 0) or 0
