@@ -48,8 +48,8 @@ PROVIDER_PRESETS = {
     },
     "gemini": {
         "base_url": "",
-        "default_fast_model": "gemini-2.5-flash",
-        "default_synthesis_model": "gemini-2.5-flash",
+        "default_fast_model": "gemini-3.6-flash",
+        "default_synthesis_model": "gemini-3.6-flash",
     },
     "openai": {
         "base_url": "https://api.openai.com/v1",

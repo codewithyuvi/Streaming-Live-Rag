@@ -181,6 +181,23 @@ def _check_rate_limit(session_id: str, client_ip: str = "127.0.0.1") -> bool:
         return True
 
 
+@app.on_event("startup")
+def _auto_seed_corpus_on_startup():
+    """Ensures dev_corpus documents are indexed on startup if the collection is empty."""
+    try:
+        from retrieval.ingest import parse_corpus, ingest_sections, get_corpus_summary
+        summary = get_corpus_summary()
+        if summary.get("total_chunks", 0) == 0:
+            corpus_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "dev_corpus"))
+            if os.path.exists(corpus_dir):
+                chunks = parse_corpus(corpus_dir)
+                if chunks:
+                    ingest_sections(chunks, reset=False)
+                    logger.info("Auto-seeded %d corpus chunks on startup into %s.", len(chunks), summary.get("collection"))
+    except Exception as e:
+        logger.warning("Auto-seed on startup failed: %s", e)
+
+
 @app.get("/health")
 def health_check(live: bool = False):
     """Healthcheck endpoint for Docker container and reproducibility validation (Gate G1)."""

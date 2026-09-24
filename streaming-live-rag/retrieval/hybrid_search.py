@@ -38,11 +38,29 @@ def get_qdrant_client() -> QdrantClient:
         with _qdrant_lock:
             if _qdrant_client is None:
                 qdrant_url = os.getenv("QDRANT_URL") or f"http://{os.getenv('QDRANT_HOST', 'localhost')}:{os.getenv('QDRANT_PORT', '6333')}"
-                _qdrant_client = QdrantClient(
-                    url=qdrant_url,
-                    api_key=os.getenv("QDRANT_API_KEY") or None,
-                    timeout=int(os.getenv("QDRANT_TIMEOUT_S", "10")),
+                use_local = os.getenv("QDRANT_LOCAL", "").lower() in ("true", "1")
+                if not use_local:
+                    try:
+                        client = QdrantClient(
+                            url=qdrant_url,
+                            api_key=os.getenv("QDRANT_API_KEY") or None,
+                            timeout=int(os.getenv("QDRANT_TIMEOUT_S", "2")),
+                            check_compatibility=False,
+                        )
+                        client.get_collections()
+                        _qdrant_client = client
+                        return _qdrant_client
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).info(
+                            "Remote Qdrant at %s unreachable; using embedded local storage in 'data/qdrant_storage'.",
+                            qdrant_url
+                        )
+                storage_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)), "data", "qdrant_storage"
                 )
+                os.makedirs(storage_dir, exist_ok=True)
+                _qdrant_client = QdrantClient(path=storage_dir, check_compatibility=False)
     return _qdrant_client
 
 
