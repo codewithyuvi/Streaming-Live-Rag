@@ -2,37 +2,43 @@
   "g1": {
     "name": "Reproducibility & Packaging",
     "passed": true,
-    "measured": "100.0%",
-    "target": "100.0%"
+    "status": "pass",
+    "measured": "100.0% (5/5)",
+    "target": "100% checks"
   },
   "g2": {
     "name": "Early Retrieval Trigger",
-    "passed": true,
-    "measured": "100.0%",
-    "target": ">= 80%"
+    "passed": false,
+    "status": "skip",
+    "measured": "Skipped: needs GROQ_API_KEY: set GROQ_API_KEY in the environment to run this gate",
+    "target": ">= 80% eligible"
   },
   "g3": {
     "name": "Multi-Intent Decomposition",
-    "passed": true,
-    "measured": "91.7%",
-    "target": ">= 70%"
+    "passed": false,
+    "status": "skip",
+    "measured": "Skipped: needs GROQ_API_KEY: set GROQ_API_KEY in the environment to run this gate",
+    "target": ">= 70% compound"
   },
   "g4": {
-    "name": "Grounding Support & Zero Fabrication",
-    "passed": true,
-    "measured": "100.0%",
+    "name": "Grounding Support & 0 Fabricated",
+    "passed": false,
+    "status": "skip",
+    "measured": "Skipped: needs GEMINI_API_KEY: set GEMINI_API_KEY in the environment to run this gate",
     "target": ">= 85%, 0 fab"
   },
   "g5": {
     "name": "Session Refinement & Suppression",
-    "passed": true,
-    "measured": "95.5% (21/22)",
-    "target": ">= 90%"
+    "passed": false,
+    "status": "skip",
+    "measured": "Skipped: needs GROQ_API_KEY: set GROQ_API_KEY in the environment to run this gate",
+    "target": "verified state continuity"
   },
   "g6": {
     "name": "Telemetry Observability",
     "passed": true,
-    "measured": "100.0%",
+    "status": "pass",
+    "measured": "100.0% (25/25)",
     "target": "100% trace coverage"
   }
 }

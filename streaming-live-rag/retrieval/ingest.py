@@ -1,8 +1,14 @@
 import os
+import sys
 import glob
 import re
 import logging
 from typing import List, Dict, Any, Optional
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 from qdrant_client.models import Distance, VectorParams, PointStruct, SparseVectorParams, SparseVector, Modifier
 
 from retrieval.hybrid_search import (

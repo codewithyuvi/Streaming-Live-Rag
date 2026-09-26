@@ -24,15 +24,15 @@ Once running, access the **Interactive Live Demo UI** at:
 
 ---
 
-## 📊 Benchmark Scorecard (All 6 Gates Passed)
+## 📊 Benchmark Scorecard (G1 + G6 Passed, G2–G5 Require Live API Keys)
 
 | Gate | Name | Target | Measured | Result |
 | :--- | :--- | :--- | :--- | :--- |
 | **G1** | **Reproducibility & Packaging** | Single-command clean boot, 100% | **100.0%** | 🟢 **PASSED** |
-| **G2** | **Early Retrieval Trigger** | $\ge 80\%$ eligible queries, 0% false | **100.0%** | 🟢 **PASSED** |
-| **G3** | **Multi-Intent Decomposition** | $\ge 70\%$ compound queries | **83.3%** | 🟢 **PASSED** |
-| **G4** | **Grounding Validation** | $\ge 85\%$ support, 0 fabricated IDs | **100.0%** | 🟢 **PASSED** |
-| **G5** | **Session Refinement** | 100% correct refinement & suppression | **100.0%** | 🟢 **PASSED** |
+| **G2** | **Early Retrieval Trigger** | Target: eligible queries, 0% false triggers | Skipped — needs `GROQ_API_KEY` | ⚪ **SKIPPED** |
+| **G3** | **Multi-Intent Decomposition** | Target: compound queries | Skipped — needs `GROQ_API_KEY` | ⚪ **SKIPPED** |
+| **G4** | **Grounding Validation** | Target: support, 0 fabricated IDs | Skipped — needs `GEMINI_API_KEY` | ⚪ **SKIPPED** |
+| **G5** | **Session Refinement** | Target: correct refinement & suppression | Skipped — needs `GROQ_API_KEY` | ⚪ **SKIPPED** |
 | **G6** | **Telemetry Observability** | 100% trace coverage & persistence | **100.0%** | 🟢 **PASSED** |
 
 Detailed scorecard results are saved to: `eval/results/scorecard.json`.

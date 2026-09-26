@@ -218,12 +218,12 @@ def extract_txt_md(data: bytes) -> List[Any]:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
     # Check for pre-tagged format: Doc_XX §Y
-    if re.search(r"Doc_\d+\s*§\d+", text):
-        blocks = [b.strip() for b in re.split(r"(?=Doc_\d+\s*§\d+)", text) if b.strip()]
+    if re.search(r"Doc_\d+\s*§\d+(?:\.\d+)*", text):
+        blocks = [b.strip() for b in re.split(r"(?=Doc_\d+\s*§\d+(?:\.\d+)*)", text) if b.strip()]
         out = []
         for b in blocks:
             lines = b.split("\n", 1)
-            if len(lines) >= 2 and (m := re.search(r"§(\d+)", lines[0])):
+            if len(lines) >= 2 and (m := re.search(r"§(\d+(?:\.\d+)*)", lines[0])):
                 sec_num = m.group(1)
                 out.append((sec_num, lines[1].strip()))
             else:

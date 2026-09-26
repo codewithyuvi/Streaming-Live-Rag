@@ -1,323 +1,179 @@
-# Baseline Test Queries (Phase 1)
-# 15 Queries based on venue_booking.txt and travel_policy.txt
+# Streaming Live RAG — Labeled Evaluation Dataset (v2)
+#
+# Machine-readable scenarios for gates G2..G5. Every expectation the gates
+# assert on lives in these fields — nothing is hidden in YAML comments.
+#
+# Sections:
+#   streaming_early_retrieval  (G2)  full utterance replayed live via
+#                                    play_utterance(); controller decisions
+#                                    and provisional timing are measured.
+#   late_detail                (G5)  two-turn session: base question, then a
+#                                    late-arriving constraint in the same
+#                                    session. Expects answer_version 1 -> 2.
+#   suppression                (G5)  presentation-only follow-up: expects
+#                                    retrieval_required == false, no new cites.
+#   chit_chat                  (G2)  false-trigger controls: no provisional.
+#   multi_intent               (G3)  compound queries with keyword intent sets.
+#   grounding_probes           (G4)  real turns whose synthesis output is
+#                                    validated (answerable + abstain probe).
 
-queries:
-  # Simple Factual (Single hop)
-  - id: q01
-    utterance: "What is the maximum capacity of the Pune workshop venue?"
-    expected_doc: "Doc_01"
-  - id: q02
-    utterance: "Who needs to approve international flights?"
-    expected_doc: "Doc_02"
-  - id: q03
-    utterance: "Is standing room permitted in Pune?"
-    expected_doc: "Doc_01"
-  - id: q04
-    utterance: "How many days in advance should I book my hotel?"
-    expected_doc: "Doc_02"
-  
-  # Chit-Chat (Should bypass retrieval in later phases)
-  - id: q05
+meta:
+  version: 2
+  description: "Streaming Live RAG eval dataset. Expectations are machine-readable; comments carry no labels."
+  gates: ["G2", "G3", "G4", "G5"]
+
+# ─── G2: early retrieval — organizer's worked example + variants ────────────
+streaming_early_retrieval:
+  - id: ser_01
+    # Organizer Theme 4 guide, Section 4, Example 1 (exact wording).
+    utterance: "I need to plan a customer workshop in Pune for 30 people, and I need the cancellation policy and the catering options."
+    words_per_chunk: 2
+    ms_per_chunk: 50
+    expected:
+      early_retrieval: true
+      wait_chunk_contains: "I need to plan a customer"
+      wait_trigger: "wait"
+      retrieve_chunk_contains: "Pune for 30 people"
+      retrieve_trigger: "retrieve_now"
+      retrieval_triggers: ["provisional", "multi_intent"]
+
+  - id: ser_02
+    utterance: "I need to book international flights for the Pune workshop and I need to know the approval process and the advance booking rule."
+    words_per_chunk: 2
+    ms_per_chunk: 50
+    expected:
+      early_retrieval: true
+      wait_chunk_contains: "I need to book"
+      wait_trigger: "wait"
+      retrieve_chunk_contains: "book international flights"
+      retrieve_trigger: "retrieve_now"
+      retrieval_triggers: ["provisional", "multi_intent"]
+
+  - id: ser_03
+    utterance: "I was wondering about the approval process for international travel and the hotel booking deadline for the trip."
+    words_per_chunk: 2
+    ms_per_chunk: 50
+    expected:
+      early_retrieval: true
+      wait_chunk_contains: "I was wondering about"
+      wait_trigger: "wait"
+      retrieve_chunk_contains: "approval process for international travel"
+      retrieve_trigger: "retrieve_now"
+      retrieval_triggers: ["provisional", "multi_intent"]
+
+# ─── G5: late-arriving detail — two turns, one session ─────────────────────
+late_detail:
+  - id: ld_01
+    # Organizer Theme 4 guide, Section 4, Example 2.
+    turns:
+      - "Summarize the travel-reimbursement rule for an employee trip."
+      - "The trip was international and the booking was made after travel."
+    words_per_chunk: 3
+    ms_per_chunk: 50
+    expected:
+      answer_versions: [1, 2]
+      turn1_citations_preserved: true
+      no_session_reset: true
+      delta_keywords: ["international", "after travel", "late-booking", "booking"]
+
+# ─── G5: presentation-only suppression ─────────────────────────────────────
+suppression:
+  - id: sup_01
+    # Organizer Theme 4 guide, Section 4, Example 3.
+    setup_utterance: "What is the cancellation policy for the Pune venue?"
+    utterance: "Please repeat your last answer in two bullets."
+    words_per_chunk: 3
+    ms_per_chunk: 50
+    expected:
+      retrieval_required: false
+      retrieval_skip_reason: "presentation_restructure"
+      no_new_citations: true
+
+# ─── G2: chit-chat false-trigger controls ──────────────────────────────────
+chit_chat:
+  - id: cc_01
     utterance: "Hello, how are you today?"
-    expected_doc: null
-  - id: q06
-    utterance: "Can you help me?"
-    expected_doc: null
-    
-  # Multi-Intent / Complex
-  - id: q07
-    utterance: "What is the Pune capacity and who approves flights?"
-    expected_doc: "Doc_01, Doc_02"
-  - id: q08
-    utterance: "I need to travel to Pune for the workshop. What's the capacity and how far in advance should I book the hotel?"
-    expected_doc: "Doc_01, Doc_02"
-    
-  # Distractor / Tricky
-  - id: q09
-    utterance: "What is the capacity of the Mumbai venue?" # Not in corpus
-    expected_doc: null
-  - id: q10
-    utterance: "Can I book a flight without VP approval if it's international?"
-    expected_doc: "Doc_02"
-    
-  # Streaming / Incremental simulation
-  - id: q11
-    utterance: "I was wondering about the..."
-    expected_doc: null # wait
-  - id: q12
-    utterance: "I was wondering about the capacity of"
-    expected_doc: null # wait
-  - id: q13
-    utterance: "I was wondering about the capacity of the Pune venue."
-    expected_doc: "Doc_01" # retrieve
-    
-  # Direct constraints
-  - id: q14
-    utterance: "Give me the exact section number that mentions hotel bookings."
-    expected_doc: "Doc_02"
-  - id: q15
-    utterance: "Does the travel policy mention anything about train travel?"
-    expected_doc: "Doc_02"
-  
-  # Single Simple Question Controls (Added for Phase 3/4)
-  - id: ctrl_01
-    utterance: "What is the cancellation policy for Pune?"
-    expected_doc: "Doc_01"
-  - id: ctrl_02
-    utterance: "Who handles the projector setup?"
-    expected_doc: "Doc_01"
-  - id: ctrl_03
-    utterance: "Are international flights allowed in economy?"
-    expected_doc: "Doc_02"
-  - id: ctrl_04
-    utterance: "What is the hotel allowance?"
-    expected_doc: "Doc_02"
-  - id: ctrl_05
-    utterance: "Where is the Pune venue located?"
-    expected_doc: null # not in corpus
-    
-  # Presentation-only / Conversational (Should NOT trigger retrieval)
-  - id: ctrl_06
-    utterance: "Let me pull up my slides."
-    expected_doc: null
-  - id: ctrl_07
-    utterance: "Can everyone see my screen ok?"
-    expected_doc: null
-  - id: ctrl_08
-    utterance: "Moving on to the next topic."
-    expected_doc: null
-  - id: ctrl_09
+    words_per_chunk: 2
+    ms_per_chunk: 50
+    expected:
+      retrieval_required: false
+      provisional_fired: false
+  - id: cc_02
+    utterance: "Good morning, can you hear me all right?"
+    words_per_chunk: 2
+    ms_per_chunk: 50
+    expected:
+      retrieval_required: false
+      provisional_fired: false
+  - id: cc_03
     utterance: "Thanks for joining the call today."
-    expected_doc: null
-  - id: ctrl_10
-    utterance: "I'll take questions at the end."
-    expected_doc: null
+    words_per_chunk: 2
+    ms_per_chunk: 50
+    expected:
+      retrieval_required: false
+      provisional_fired: false
 
-  # ─── Phase 4: Compound / Multi-Intent Cases (q16 – q31) ─────────────
-
-  # Cross-document compound queries (2 intents)
-  - id: q16
+# ─── G3: multi-intent decomposition ────────────────────────────────────────
+# A sub-query matches an intent if it contains >= 1 keyword from the set
+# (case-insensitive). A scenario passes when >= 2 distinct intent sets match.
+multi_intent:
+  - id: mi_01
     utterance: "What is the cancellation policy for venues and what are the rules for late flight bookings?"
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 2
+    expected_intent_keywords:
+      - ["cancellation", "cancel", "refund", "penalty"]
+      - ["flight", "booking", "late-booking", "travel"]
 
-  - id: q17
+  - id: mi_02
     utterance: "Tell me about standing room in the Pune venue and whether VP sign-off is needed for emergencies."
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 2
+    expected_intent_keywords:
+      - ["standing room", "capacity", "venue", "pune"]
+      - ["vp", "sign-off", "approval", "emergencies", "emergency"]
 
-  - id: q18
+  - id: mi_03
     utterance: "How many people can fit in the workshop and how many days before do I need to book flights?"
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 2
+    expected_intent_keywords:
+      - ["capacity", "people", "fit", "attendees", "workshop"]
+      - ["book", "days", "advance", "flights", "flight"]
 
-  - id: q19
-    utterance: "I need to know the refund rules for venue cancellation and also the travel reimbursement approval process."
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 2
-
-  - id: q20
-    utterance: "Is there a penalty for late venue cancellation, and can I get a late-booking exception for my flight?"
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 2
-
-  # Three-intent compound queries
-  - id: q21
+  - id: mi_04
     utterance: "What is the venue capacity, what is the cancellation penalty, and who approves international travel?"
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 3
+    expected_intent_keywords:
+      - ["capacity", "venue"]
+      - ["cancellation", "penalty", "cancel"]
+      - ["approves", "approval", "international travel", "director"]
 
-  - id: q22
-    utterance: "I need three things: the Pune venue limit, the 48-hour cancellation rule details, and the flight advance booking requirement."
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 3
+  - id: mi_05
+    utterance: "I need to know the refund rules for venue cancellation and also the travel reimbursement approval process."
+    expected_intent_keywords:
+      - ["refund", "cancellation", "cancel", "venue"]
+      - ["reimbursement", "approval", "travel"]
 
-  # Naturally embedded multi-intent (conversational style)
-  - id: q23
-    utterance: "I'm planning a workshop trip to Pune. Can you tell me how many people the venue holds and also what approvals I need for the flight?"
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 2
-
-  - id: q24
-    utterance: "My manager asked me to check two things — the cancellation terms for the venue and whether we need Director or VP approval for international travel."
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 2
-
-  - id: q25
+  - id: mi_06
     utterance: "Before I book everything, I want to confirm the maximum attendees for Pune, the cancellation penalty percentage, and the advance booking days for flights."
-    expected_doc: "Doc_01, Doc_02"
-    expected_intents: 3
+    expected_intent_keywords:
+      - ["attendees", "capacity", "maximum", "pune"]
+      - ["cancellation", "penalty"]
+      - ["advance booking", "booking days", "flights"]
 
-  # Single-intent controls (should NOT be over-fragmented)
-  - id: q26
-    utterance: "What is the cancellation policy?"
-    expected_doc: "Doc_01"
-    expected_intents: 1
-
-  - id: q27
-    utterance: "How far in advance do I need to book international flights?"
-    expected_doc: "Doc_02"
-    expected_intents: 1
-
-  - id: q28
-    utterance: "Tell me everything about the Pune workshop venue."
-    expected_doc: "Doc_01"
-    expected_intents: 1
-
-  # Compound with one unanswerable sub-intent
-  - id: q29
-    utterance: "What is the Pune venue capacity and what is the parking situation there?"
-    expected_doc: "Doc_01"
-    expected_intents: 2
-
-  - id: q30
-    utterance: "Can you explain the travel reimbursement process and also the meal allowance policy?"
-    expected_doc: "Doc_02"
-    expected_intents: 2
-
-  # Edge case: conjunction that is NOT multi-intent
-  - id: q31
-    utterance: "What are the conditions and penalties for late venue cancellation?"
-    expected_doc: "Doc_01"
-    expected_intents: 1
-
-  # ─── Phase 5: Late-Detail / Refinement Cases (q32 – q42) ──────────────
-  # These test the refinement classifier. They simulate multi-turn conversations
-  # where a prior turn provides context.
-
-  # Late-detail: adds constraint to previous venue query
-  - id: q32
-    utterance: "What is the capacity of the Pune venue?"
-    expected_doc: "Doc_01"
-    refinement_type: "NEW_TOPIC"
-    prior_utterance: null
-
-  - id: q33
-    utterance: "And what about the cancellation penalty?"
-    expected_doc: "Doc_01"
-    refinement_type: "LATE_DETAIL"
-    prior_utterance: "What is the capacity of the Pune venue?"
-
-  - id: q34
-    utterance: "Actually, I meant if we cancel within 24 hours"
-    expected_doc: "Doc_01"
-    refinement_type: "LATE_DETAIL"
-    prior_utterance: "What is the cancellation policy?"
-
-  - id: q35
-    utterance: "Wait, the trip was international, not domestic"
-    expected_doc: "Doc_02"
-    refinement_type: "LATE_DETAIL"
-    prior_utterance: "Who approves domestic flights?"
-
-  - id: q36
-    utterance: "What if there are more than 30 people?"
-    expected_doc: "Doc_01"
-    refinement_type: "LATE_DETAIL"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q37
-    utterance: "Does that apply to VP-level approvals too?"
-    expected_doc: "Doc_02"
-    refinement_type: "LATE_DETAIL"
-    prior_utterance: "What approvals are needed for international travel?"
-
-  - id: q38
-    utterance: "And what if it's a client emergency?"
-    expected_doc: "Doc_02"
-    refinement_type: "LATE_DETAIL"
-    prior_utterance: "How far in advance do I need to book flights?"
-
-  # New topic after a prior conversation (not a refinement)
-  - id: q39
-    utterance: "Now tell me about the travel reimbursement process."
-    expected_doc: "Doc_02"
-    refinement_type: "NEW_TOPIC"
-    prior_utterance: "What is the capacity of the Pune venue?"
-
-  - id: q40
-    utterance: "Switching gears — what's the venue cancellation policy?"
-    expected_doc: "Doc_01"
-    refinement_type: "NEW_TOPIC"
-    prior_utterance: "Who approves international flights?"
-
-  - id: q41
-    utterance: "Can I also ask about hotel booking deadlines?"
-    expected_doc: "Doc_02"
-    refinement_type: "NEW_TOPIC"
-    prior_utterance: "What is the cancellation penalty for venues?"
-
-  - id: q42
-    utterance: "One more thing — is standing room allowed?"
-    expected_doc: "Doc_01"
-    refinement_type: "LATE_DETAIL"
-    prior_utterance: "How many people fit in the Pune venue?"
-
-  # ─── Phase 5: Presentation-Only Cases (q43 – q53) ─────────────────────
-  # These should be classified as PRESENTATION_ONLY and trigger NO retrieval.
-
-  - id: q43
-    utterance: "OK, got it."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q44
-    utterance: "Thanks!"
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q45
-    utterance: "Thank you so much."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q46
-    utterance: "Perfect, that's what I needed."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q47
-    utterance: "Understood."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q48
-    utterance: "Great, thanks for the info."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q49
-    utterance: "Hmm, let me think about that."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q50
-    utterance: "I see."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q51
-    utterance: "Awesome!"
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q52
-    utterance: "Alright."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
-
-  - id: q53
-    utterance: "OK OK, moving on."
-    expected_doc: null
-    refinement_type: "PRESENTATION_ONLY"
-    prior_utterance: "What is the maximum capacity of the Pune workshop venue?"
+# ─── G4: grounding probes — real synthesis output is validated ─────────────
+grounding_probes:
+  - id: gp_01
+    utterance: "What is the maximum capacity of the Pune workshop venue?"
+    words_per_chunk: 3
+    ms_per_chunk: 50
+    expect_abstain: false
+  - id: gp_02
+    utterance: "What is the cancellation policy for the Pune venue?"
+    words_per_chunk: 3
+    ms_per_chunk: 50
+    expect_abstain: false
+  - id: gp_03
+    utterance: "Who needs to approve international travel?"
+    words_per_chunk: 3
+    ms_per_chunk: 50
+    expect_abstain: false
+  - id: gp_04
+    utterance: "What is the hotel reimbursement limit for international trips?"
+    words_per_chunk: 3
+    ms_per_chunk: 50
+    expect_abstain: true

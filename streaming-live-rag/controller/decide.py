@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import re
 
 # Ensure parent directory is on sys.path for llm_config import
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -48,6 +49,7 @@ def decide_retrieval(partial_utterance: str) -> dict:
        - "Give me the" -> wait.
     """
     
+    response = None
     try:
         response = call_fast(
             messages=[
@@ -59,10 +61,31 @@ def decide_retrieval(partial_utterance: str) -> dict:
             max_tokens=400
         )
     except Exception as e:
-        return {"trigger": "wait", "reason": f"Fallback due to api error: {str(e)}", "degraded": True}
-    
+        try:
+            response = call_fast(
+                messages=[
+                    {"role": "system", "content": system_prompt + "\nOutput strictly valid JSON with no markdown formatting."},
+                    {"role": "user", "content": partial_utterance}
+                ],
+                temperature=0.0,
+                max_tokens=400
+            )
+        except Exception as e2:
+            return {"trigger": "wait", "reason": f"Fallback due to api error: {str(e2)}", "degraded": True}
+
     try:
-        decision = json.loads(response.choices[0].message.content)
+        raw_text = response.choices[0].message.content.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
+        try:
+            decision = json.loads(raw_text)
+        except Exception:
+            m = re.search(r"\{.*\}", raw_text, re.DOTALL)
+            if m:
+                decision = json.loads(m.group(0))
+            else:
+                raise
         trigger = decision.get("trigger")
         # Normalize spec alias: ARCHITECTURE_BRIEF uses `trigger_now`,
         # runtime historically used `retrieve_now`. Accept both.

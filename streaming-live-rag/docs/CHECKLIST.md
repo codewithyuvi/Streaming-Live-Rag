@@ -9,7 +9,7 @@ This checklist tracks engineering deliverables and official submission requireme
 - [x] **Working Prototype Code:** Full streaming live RAG pipeline implemented (`api/main.py`, two-stage controller, multi-intent decomposition, hybrid Qdrant search, session refinement, claim-level grounding).
 - [x] **Reproducible Packaging (Gate 1):** Single-command setup via `docker compose up --build -d` and local virtual environment support (`requirements.txt`).
 - [x] **Pre-cached Embeddings & Deterministic Offline Build:** Dockerfile caches FastEmbed models (`bge-small`, `bm25`, `ms-marco-MiniLM`) at build time to prevent network timeouts during evaluation.
-- [x] **Evaluation Gate Suite (Gates G1–G6):** Master evaluation runner (`eval/run_eval.py`, `run_eval.bat`, `run_eval.sh`) with 100% pass across all 6 gates documented in `eval/results/scorecard.json`.
+- [x] **Evaluation Gate Suite (Gates G1–G6):** Master evaluation runner (`eval/run_eval.py`, `run_eval.bat`, `run_eval.sh`). Honest scorecard in `eval/results/scorecard.json`: G1 PASS 100% (5/5), G6 PASS 100% (25/25); G2–G5 SKIP (require GROQ_API_KEY/GEMINI_API_KEY live services). Never claim passes for gates that were not measured.
 - [x] **Interactive Demonstration Dashboard:** Web UI (`static/index.html`, `scripts/start_ui.bat`) featuring simulated chunk-by-chunk speech streaming, 6 one-click evaluation presets, controller visualizer, and live latency breakdown.
 - [x] **Full Documentation Suite:**
   - `README.md` — 3-command quick start, architecture overview, and scorecard summary.

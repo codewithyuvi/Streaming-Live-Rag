@@ -64,3 +64,11 @@ class TelemetryEvent(BaseModel):
     degraded: bool = False
     latencies_ms: LatenciesMs = Field(default_factory=LatenciesMs)
     token_cost: TokenCost = Field(default_factory=TokenCost)
+    # Honest streaming anchors (wall-clock seconds since stream start).
+    # utterance_end_s: when the user finished speaking; provisional_fired_s:
+    # when the provisional retrieval task was actually created (None if never).
+    # G2 "retrieval commenced prior to final transcript completion" is
+    # provisional_fired_s < utterance_end_s — both measured, never arithmetic.
+    utterance_end_s: float = 0.0
+    provisional_fired_s: Optional[float] = None
+    thought_process: str = ""

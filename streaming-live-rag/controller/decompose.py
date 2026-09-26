@@ -14,6 +14,7 @@ Design decisions:
 import os
 import sys
 import json
+import re
 
 # Ensure parent directory is on sys.path for llm_config import
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -66,6 +67,7 @@ Examples:
 - "I need the gym membership fee, the pool schedule, and the guest parking policy" → 3 sub-queries
 """
 
+    response = None
     try:
         response = call_fast(
             messages=[
@@ -74,14 +76,35 @@ Examples:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=500
+            max_tokens=600
         )
     except Exception as e:
-        # Fallback: treat the whole utterance as a single query and mark degraded
-        return [{"sub_query": utterance, "intent": "fallback_single", "degraded": True, "error": str(e)}]
+        # If Groq server-side json validation fails or limits tokens, retry cleanly
+        try:
+            response = call_fast(
+                messages=[
+                    {"role": "system", "content": system_prompt + "\nOutput strictly valid JSON with no markdown formatting."},
+                    {"role": "user", "content": utterance}
+                ],
+                temperature=0.0,
+                max_tokens=600
+            )
+        except Exception as e2:
+            return [{"sub_query": utterance, "intent": "fallback_single", "degraded": True, "error": str(e2)}]
 
     try:
-        result = json.loads(response.choices[0].message.content)
+        raw_text = response.choices[0].message.content.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
+        try:
+            result = json.loads(raw_text)
+        except Exception:
+            m = re.search(r"\{.*\}", raw_text, re.DOTALL)
+            if m:
+                result = json.loads(m.group(0))
+            else:
+                raise
         sub_queries = result.get("sub_queries", [])
 
         # Validate and enforce cap

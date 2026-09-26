@@ -200,3 +200,43 @@ Run all 6 evaluation gates with a single command to generate the scorecard:
 | `FastEmbed download timeout` | Pre-download models or run `python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"` |
 | `UI shows API Offline` | The UI includes an automatic fallback to local simulated mode so you can test all 6 scenarios even without a running backend. To connect live, start `uvicorn api.main:app --reload`. |
 
+---
+
+## 5. Manual QA Checklist (Post-Fix Verification)
+
+The items below cover behavior that is UI/timing-driven and cannot run under
+`pytest` (in particular, the client-side 60s turn-timeout clock, which is
+plain browser JS with no test runner wired into this repo). Run these by
+hand against `uvicorn api.main:app --reload` on `:8000` after any change to
+`static/index.html`, `api/main.py`, or `streaming/engine.py`:
+
+1. **No phantom turns on idle load.** Load the page fresh and wait 2+
+   minutes without touching it. Zero "Thinking…" bubbles should appear.
+2. **Typing never opens a turn.** Type a query character by character and
+   never press Enter/Send. No turn opens, Send stays clickable, the input
+   stays editable.
+3. **One turn per real action.** Run both benchmark scenarios plus one typed
+   query ended with Enter. Each opens exactly one turn, and the clock stops
+   on the real answer.
+4. **60s hard timeout (test (d)).** Manually stall a turn past 60s — or
+   temporarily lower `TURN_TIMEOUT_MS` in `static/index.html` (WS path) and
+   the `setTimeout(..., TURN_TIMEOUT_MS)` in `submitUserMessage()`'s
+   `AbortController` (HTTP-fallback path) to something small, e.g. 5000, to
+   test faster. Confirm: the "Thinking (Ns)…" clock/pill stops updating, the
+   bubble shows the "exceeded the 60s limit" message, and Send/input
+   re-enable. This is the one check that genuinely can't run under pytest
+   since the clock is client-side `setInterval`/`setTimeout` — if a JS test
+   runner is ever added to this repo, promote this to an automated test.
+5. **Test Connection shows real names.** Click Test Connection in the BYOK
+   modal → real provider/model names (or a real error string), never the
+   literal text `undefined`.
+6. **Reseed/upload failure is not disguised as success.** With `ADMIN_TOKEN`
+   unset, call Reseed/Upload from a non-loopback origin (e.g. through a
+   tunnel/proxy) → an error alert is shown, not a false "success" message
+   with `undefined` interpolated into it.
+7. **HUD fully clears on session reset.** Run a turn so the HUD populates,
+   then reset the session mid-conversation → latency, grounding, intents,
+   and version all clear back to their placeholder values (`— ms`, `—`,
+   `0 Intents`, `v1`), not just the version.
+
+

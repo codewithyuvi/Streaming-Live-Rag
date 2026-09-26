@@ -8,23 +8,23 @@
 
 ## 1. Metrics Scorecard (Gates G1–G6)
 
-The system was evaluated against all hackathon benchmark gates. All 6 gates passed.
+The system was evaluated against all hackathon benchmark gates. G1 and G6 passed; G2–G5 were SKIPPED in this environment (they require live GROQ_API_KEY / GEMINI_API_KEY credentials). No gate was marked passed without a measured run.
 
 | Metric / Gate | Target | Measured Result | Status | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | **G1 Reproducibility** | Pass/Fail unattended | **100.0% Pass** | **PASSED** | Single-command execution via `eval/run_eval.py`, `run_eval.bat`, and `docker-compose.yml`. |
-| **G2 Early Retrieval Rate** | ≥ 80% eligible cases | **100.0%** (8/8) | **PASSED** | Intercepts stable query prefixes at $t_1$, saving 400–1200ms of user utterance duration. |
-| **G2 False-Trigger Rate** | 0% false-trigger | **0.0%** (0/4) | **PASSED** | Chit-chat / non-retrieval queries correctly identified and suppressed with zero DB load. |
-| **G3 Multi-Intent Identification** | ≥ 70% compound cases | **100.0%** (12/12) | **PASSED** | Decomposes compound requests; 0.0% over-fragmentation on single controls; Quota Merge active. |
-| **G4 Citation Support** | ≥ 85%, 0 fabricated | **100.0%** (14/14) | **PASSED** | Deterministic bracket-normalized validator. 0 fabricated citations detected. |
-| **G5 Session Continuity** | ≥ 90% refinement / suppression | **95.5%** (21/22) | **PASSED** | Commit semantics $1 \to 1 \to 2 \to 1$ verified across `NEW_TOPIC`, `PRESENTATION_ONLY`, and `LATE_DETAIL`. |
+| **G2 Early Retrieval Rate** | ≥ 80% eligible cases | Skipped — needs GROQ_API_KEY | **SKIPPED** | Requires live provider credentials to measure. |
+| **G2 False-Trigger Rate** | 0% false-trigger | Skipped — needs GROQ_API_KEY | **SKIPPED** | Requires live provider credentials to measure. |
+| **G3 Multi-Intent Identification** | ≥ 70% compound cases | Skipped — needs GROQ_API_KEY | **SKIPPED** | Requires live provider credentials to measure. |
+| **G4 Citation Support** | ≥ 85%, 0 fabricated | Skipped — needs GEMINI_API_KEY | **SKIPPED** | Requires live provider credentials to measure. |
+| **G5 Session Continuity** | ≥ 90% refinement / suppression | Skipped — needs GROQ_API_KEY | **SKIPPED** | Requires live provider credentials to measure. |
 | **G6 Telemetry Field Coverage** | 100% field coverage | **100.0%** (13/13 fields) | **PASSED** | All schema fields populated: `controller_decisions`, `retrieval_events`, `token_cost`, latencies. Audits `logs/telemetry.jsonl` (run `pytest tests/test_pipeline.py` or turn to populate). |
 
 ---
 
 ## 2. Latency & Resource Utilization Profile
 
-Measurements taken on local test harness with dual-provider configuration (Groq LPU + Gemini Flash):
+The table below was recorded in a keyed local environment (Groq LPU + Gemini Flash). It is not reproduced by the unkeyed eval run shipped in `eval/results/` — re-run with your own `GROQ_API_KEY` / `GEMINI_API_KEY` to reproduce these numbers:
 
 | Stage | P50 (ms) | P95 (ms) | Budget (ms) | Compliance |
 | :--- | :--- | :--- | :--- | :--- |
