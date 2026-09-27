@@ -8,16 +8,16 @@ This document outlines the end-to-end architecture for the Streaming Live RAG sy
 
 ```mermaid
 flowchart TD
-    A["Audio / Text Stream (Simulated Chunks)"] --> B["Chunk Stability & Stop-Word Guard"]
+    A["Audio / Text Stream (Live WS or Paced HTTP Chunks)"] --> B["Chunk Stability & Stop-Word Guard"]
     B --> C{"Controller Decision\n(Groq LPU, ~240ms)"}
     
     C -- "no_retrieval_needed\n(Chit-chat / greetings)" --> C2["Early Direct Reply\n(0 DB queries, 0ms search)"]
     C -- "wait" --> A
     
-    C -- "trigger_now\n(at t1)" --> D["Provisional Retrieval Task"]
+    C -- "trigger_now\n(at t1)" --> D["Provisional Retrieval Task\n(Thought: provisional_search)"]
     D --> E["Multi-Intent Decomposer\n(1..4 Orthogonal Sub-Queries)"]
     
-    E --> F["Parallel Hybrid Search\n(Qdrant: BGE Dense + BM25 Sparse IDF)"]
+    E --> F["Parallel Hybrid Search\n(Qdrant Dense BGE + BM25 Sparse IDF)"]
     F --> G["Quota Merge\n(Min 2 per sub-query, Cap 8)"]
     G --> H["Cross-Encoder Reranker\n(ms-marco-MiniLM-L-6-v2)"]
     
@@ -32,21 +32,37 @@ flowchart TD
     M -- "ungrounded claims" --> N["Retry Once with Warning\n(Abstain if persistent)"]
     M -- "validated" --> O["Session Commit & State Update\n(Citations Unioned, v=1 -> v=2)"]
     
-    O --> P["Final Streamed Response + Citations"]
+    O --> P["Final Streamed Response + Citations\n(Thought: synthesis_ready)"]
     P --> Q["Structured Telemetry Sink\n(G6 100% JSON Coverage)"]
 ```
 
 ---
 
-## 2. Component Boundaries & Interfaces
+## 2. 4-Phase Honest Thought Stream Architecture
+
+To provide explainability and inspectability in real-time without artificial delays or pre-canned logs, the core engine emits honest structured thought events reflecting genuine pipeline state:
+
+| Phase | Event Type | Description | Timing & Trigger |
+| :--- | :--- | :--- | :--- |
+| **Phase 1** | `intent_detected` | Speculatively classifies user intent while speech chunks arrive every ~300ms. Identifies whether the utterance is informational, conversational, or an in-session refinement. | Mid-utterance ($t < t_{end}$) |
+| **Phase 2** | `provisional_search` | Launched as soon as the controller detects a stable prefix. Hybrid retrieval runs speculatively in the background while the speaker is still talking. | Early trigger ($t_1$) |
+| **Phase 3** | `decomposition_planned` | At utterance end ($t_{end}$), the decomposer analyzes the full query for multiple orthogonal intents and plans delta queries. | Utterance completion ($t_{end}$) |
+| **Phase 4** | `synthesis_ready` | Synthesizes the response, validates claim-level citations against indexed chunks, computes grounding confidence, and updates session version. | Pre-emission ($t_{synth}$) |
+
+Both the live WebSocket endpoint (`/ws/stream`) and the HTTP turn endpoint (`/turn`) emit this thought stream. In HTTP turns, all emitted thoughts are collected and returned in the `TurnResponse.thoughts` array.
+
+---
+
+## 3. Component Boundaries & Interfaces
 
 | Component | Responsible for | Interface | Audit Reference |
 | :--- | :--- | :--- | :--- |
-| **Stream Simulator** | Replaying full utterance as timestamped incremental chunks. | `simulate_stream(utterance, chunk_size, delay_ms)` | `streaming/stream_simulator.py` |
-| **Heuristics & Guard** | Token count, question word detection, stop-word trailing guard. | `is_stable_enough(text) -> bool` | Finding H4 (`controller/heuristics.py`) |
+| **Unified Turn Engine** | Single source of truth for executing live streaming turns and emitting thought events. | `run_live_turn(session_id, source, emit_event)` | `streaming/engine.py` |
+| **Live Stream Source** | Real-time queue for WebSockets and paced playback for HTTP replays. | `LiveQueueSource`, `play_utterance(text, words, ms)` | `streaming/live_stream.py` |
+| **Heuristics & Guard** | Token count, question word detection, trailing stop-word guard. | `is_stable_enough(text) -> bool` | Finding H4 (`controller/heuristics.py`) |
 | **Two-Stage Controller** | Fast decision: `trigger_now`, `wait`, `no_retrieval_needed`. Early return for chit-chat. | `decide_retrieval(text) -> ControllerDecision` | Findings C2, C3 (`controller/decide.py`) |
 | **Multi-Intent Decomposer** | Splitting compound requests into 1..4 orthogonal sub-queries. | `decompose_query(utterance) -> list[str]` | Finding H7 (`controller/decompose.py`) |
-| **Hybrid Search (Qdrant)** | Parallel dense BGE-Small and sparse BM25 (`Modifier.IDF`) queries. | `retrieve_and_rerank(query, top_k) -> list[dict]` | Finding H6 (`retrieval/hybrid_search.py`) |
+| **Hybrid Search (Qdrant)** | Parallel dense BGE-Small and sparse BM25 (`Modifier.IDF`) queries with embedded auto-fallback. | `retrieve_and_rerank(query, top_k) -> list[dict]` | Finding H6 (`retrieval/hybrid_search.py`) |
 | **Quota Result Merger** | Deduplicating candidates while allocating min 2 chunks per sub-query, cap 8 chunks total. | `merge_with_quota(sub_results, min_per_query=2, cap=8)` | Finding H8 (`retrieval/merge.py`) |
 | **Cross-Encoder Reranker** | Rescoring candidate chunks using `ms-marco-MiniLM-L-6-v2`. | Embedded in `retrieve_and_rerank()` | `retrieval/hybrid_search.py` |
 | **Session Refinement Classifier** | Classifying turns into `NEW_TOPIC`, `LATE_DETAIL`, or `PRESENTATION_ONLY`. | `classify_refinement(history, utterance) -> str` | Findings C4, C7 (`controller/refinement.py`) |
@@ -57,7 +73,7 @@ flowchart TD
 
 ---
 
-## 3. Core Data & Telemetry Schema
+## 4. Core Data & Telemetry Schema
 
 The pipeline emits a strict, self-contained telemetry event for every turn:
 
@@ -108,17 +124,16 @@ The pipeline emits a strict, self-contained telemetry event for every turn:
 
 ---
 
-## 4. Final Technology Stack
+## 5. Technology Stack & Design Decisions
 
 | Layer | Component | Implementation | Key Justification |
 | :--- | :--- | :--- | :--- |
-| **API Framework** | FastAPI + Uvicorn | Python 3.11+, async native | Async `asyncio.to_thread` for non-blocking I/O (H1). |
-| **Fast LLM (Controller)** | Groq LPU API | `openai/gpt-oss-20b` / `groq/compound-mini` | Sub-400ms decision latency for streaming chunks (ADR-4). |
-| **Synthesis LLM** | Gemini API | `gemini-3.8-flash` / `gemini-2.5-flash` | Superior synthesis quality, citation reasoning, and cost. |
-| **Vector & Sparse DB** | Qdrant | Docker `qdrant/qdrant:v1.13.2` | Native RRF fusion, named dense+sparse vectors in single node. |
+| **API Framework** | FastAPI + Uvicorn | Python 3.10+, async native | Real-time WebSockets, streaming endpoints, and non-blocking I/O. |
+| **Fast LLM (Controller)** | Groq LPU API | `openai/gpt-oss-20b` / `llama-3.1-8b-instant` | Sub-400ms decision latency for chunk-by-chunk stream evaluation (ADR-4). |
+| **Synthesis LLM** | Gemini API | `gemini-3.5-flash-lite` / `gemini-2.5-flash` | Superior synthesis quality, citation reasoning, and hallucination resistance. |
+| **Vector & Sparse DB** | Qdrant | Docker `qdrant:v1.13.2` with embedded fallback | Native RRF fusion, named dense+sparse vectors in single node, zero external dependency fallback. |
 | **Dense Embeddings** | FastEmbed | `BAAI/bge-small-en-v1.5` | High retrieval accuracy, local ONNX runtime, zero API cost. |
 | **Sparse Embeddings** | FastEmbed | `Qdrant/bm25` (`Modifier.IDF`) | Deterministic lexical matching for numbers and policy codes. |
 | **Cross-Encoder Reranker**| FastEmbed | `Xenova/ms-marco-MiniLM-L-6-v2` | High precision reranking without GPU requirements. |
 | **Grounding Verification**| In-house | 44-line deterministic validator | Zero LLM cost, catches fabricated IDs and bracket variants. |
-| **Evaluation Suite** | In-house Gates G1–G6 | `eval/run_eval.py` + `labeled_set.yaml` | Unattended automated pass/fail verification for hackathon. |
-
+| **Evaluation Suite** | In-house Gates G1–G6 | `eval/run_eval.py` + `labeled_set.yaml` | Automated pass/fail verification for hackathon compliance. |
