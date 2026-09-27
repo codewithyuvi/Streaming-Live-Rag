@@ -7,796 +7,328 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
+
     :root {
-      --bg-dark: #070b14;
-      --bg-sidebar: #0b1120;
-      --bg-card: #0f172a;
-      --bg-input: #111a2e;
-      --card-border: rgba(255, 255, 255, 0.08);
-      --card-border-focus: rgba(56, 189, 248, 0.5);
-      --accent: #38bdf8;
-      --accent-glow: rgba(56, 189, 248, 0.25);
-      --purple: #a855f7;
-      --purple-glow: rgba(168, 85, 247, 0.25);
-      --success: #10b981;
-      --success-glow: rgba(16, 185, 129, 0.25);
-      --warning: #f59e0b;
-      --warning-glow: rgba(245, 158, 11, 0.25);
-      --error: #ef4444;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
+      --bg-main: #ffffff;
+      --bg-sidebar: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-input: #ffffff;
+      --border-color: #e2e8f0;
+      --accent: #4F46E5;
+      --accent-hover: #4338ca;
+      --text-main: #0f172a;
+      --text-muted: #475569;
       --text-dim: #64748b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --thought-bg: #f8fafc;
+      --user-msg-bg: #f1f5f9;
+    }
+    [data-theme="dark"] {
+      --bg-main: #212121;
+      --bg-sidebar: #171717;
+      --bg-card: #212121;
+      --bg-input: #2f2f2f;
+      --border-color: #333333;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text-main: #ececec;
+      --text-muted: #b4b4b4;
+      --text-dim: #888888;
+      --thought-bg: #171717;
+      --user-msg-bg: #2f2f2f;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: var(--bg-dark);
-      color: var(--text);
+      background-color: var(--bg-main);
+      color: var(--text-main);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
+      transition: background-color 0.2s, color 0.2s;
     }
 
-    /* Custom Scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
-    /* Top Nav */
+    /* Header */
     header {
       height: 56px;
-      background: rgba(11, 17, 32, 0.85);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--card-border);
+      background: var(--bg-main);
+      border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 18px;
+      padding: 0 16px;
       z-index: 20;
     }
     .brand { display: flex; align-items: center; gap: 10px; }
     .brand-logo {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: linear-gradient(135deg, #0284c7, #6366f1);
+      width: 28px; height: 28px; border-radius: 6px;
+      background: var(--accent); color: white;
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.1rem; box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
     }
-    .brand-title { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
-    .brand-sub { font-size: 0.72rem; color: var(--text-muted); }
+    .brand-title { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; color: var(--text-main); }
+    .brand-sub { font-size: 0.75rem; color: var(--text-muted); display: none; }
+    @media (min-width: 768px) { .brand-sub { display: block; } }
 
-    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
     .pill {
-      font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px;
-      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 6px;
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--bg-sidebar); border: 1px solid var(--border-color); color: var(--text-muted);
     }
-    .pill-dot { width: 6px; height: 6px; border-radius: 50%; }
-    .pill-green { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .pill-green .pill-dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
-    .pill-blue { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
-    .pill-blue .pill-dot { background: #38bdf8; }
+    .pill.active { color: var(--text-main); }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
+    .pill-green.active .pill-dot { background: var(--success); }
+    .pill-blue.active .pill-dot { background: var(--accent); }
 
     .header-btn {
-      background: var(--bg-card);
-      border: 1px solid var(--card-border);
-      color: var(--text);
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 8px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 6px 8px;
+      border-radius: 6px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       transition: all 0.2s;
     }
-    .header-btn:hover { border-color: var(--accent); background: rgba(56, 189, 248, 0.08); }
+    .header-btn:hover { background: var(--bg-sidebar); color: var(--text-main); }
+    .header-btn.outline { border-color: var(--border-color); }
+    .header-btn.outline:hover { border-color: var(--text-dim); }
+    .header-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+    .header-btn.primary:hover { background: var(--accent-hover); color: white; }
 
-    /* App Container (Sidebar + Chat) */
-    .app-container {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 56px);
-      position: relative;
-    }
+    /* App Container */
+    .app-container { display: flex; flex: 1; height: calc(100vh - 56px); position: relative; }
 
     /* Sidebar */
     .sidebar {
-      width: 320px;
+      width: 280px;
       background: var(--bg-sidebar);
-      border-right: 1px solid var(--card-border);
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: 16px;
-      gap: 16px;
-      z-index: 10;
-      transition: transform 0.25s;
+      border-right: 1px solid var(--border-color);
+      display: flex; flex-direction: column; overflow-y: auto; padding: 16px; gap: 20px; z-index: 10;
     }
 
-    /* Live Mode Switch Card */
+    /* Live Toggle */
     .live-toggle-card {
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.08));
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 12px;
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      display: flex; flex-direction: column; gap: 8px;
+      padding-bottom: 16px; border-bottom: 1px solid var(--border-color);
     }
-    .live-toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .live-toggle-title {
-      font-size: 0.85rem; font-weight: 700; color: #fff;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .live-toggle-sub {
-      font-size: 0.72rem; color: var(--text-muted); line-height: 1.4;
-    }
+    .live-toggle-row { display: flex; justify-content: space-between; align-items: center; }
+    .live-toggle-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+    .live-toggle-sub { font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; }
 
-    /* Toggle switch switch */
-    .switch {
-      position: relative; display: inline-block; width: 44px; height: 24px;
-    }
+    .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
       position: absolute; cursor: pointer; inset: 0;
-      background-color: #1e293b; border: 1px solid var(--card-border);
-      transition: .3s; border-radius: 24px;
+      background-color: var(--border-color); transition: .3s; border-radius: 20px;
     }
     .slider:before {
-      position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+      position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
       background-color: #fff; transition: .3s; border-radius: 50%;
     }
-    input:checked + .slider {
-      background-color: #0284c7; border-color: var(--accent);
-      box-shadow: 0 0 10px var(--accent-glow);
-    }
-    input:checked + .slider:before { transform: translateX(20px); }
+    input:checked + .slider { background-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(16px); }
 
     /* Section Headers */
     .sidebar-section-title {
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: var(--text-dim);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
+      font-size: 0.75rem; font-weight: 600; color: var(--text-main);
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
     }
 
-    /* Scenarios List */
+    /* Scenarios */
     .scenario-item {
-      background: var(--bg-card);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 8px;
+      padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;
+      border: 1px solid transparent; display: flex; flex-direction: column; gap: 4px;
     }
-    .scenario-item:hover {
-      border-color: rgba(56, 189, 248, 0.4);
-      background: rgba(56, 189, 248, 0.04);
-      transform: translateY(-1px);
-    }
-    .scenario-item.active {
-      border-color: var(--accent);
-      background: rgba(56, 189, 248, 0.08);
-      box-shadow: 0 0 12px var(--accent-glow);
-    }
-    .scenario-top {
-      display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
-    }
-    .scenario-title { font-size: 0.78rem; font-weight: 700; color: #fff; }
-    .scenario-tag {
-      font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase;
-    }
-    .scenario-query {
-      font-size: 0.72rem; color: #cbd5e1; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    .scenario-item:hover { background: var(--bg-main); border-color: var(--border-color); }
+    .scenario-item.active { background: var(--bg-main); border-color: var(--accent); }
+    .scenario-top { display: flex; justify-content: space-between; align-items: center; }
+    .scenario-title { font-size: 0.8rem; font-weight: 500; color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+    .scenario-tag { font-size: 0.65rem; font-weight: 500; padding: 2px 6px; border-radius: 4px; background: var(--bg-sidebar); border: 1px solid var(--border-color); color: var(--text-muted); }
+    .scenario-query { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* HUD Mini Grid in Sidebar */
-    .hud-mini-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-    }
-    .hud-mini-card {
-      background: var(--bg-card);
-      border: 1px solid var(--card-border);
-      border-radius: 8px; padding: 8px 10px;
-    }
-    .hud-mini-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
-    .hud-mini-val { font-size: 0.9rem; font-weight: 700; color: #fff; margin-top: 2px; }
+    /* HUD Grid */
+    .hud-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hud-mini-card { padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+    .hud-mini-label { font-size: 0.7rem; color: var(--text-muted); font-weight: 500; margin-bottom: 2px; }
+    .hud-mini-val { font-size: 0.9rem; font-weight: 600; color: var(--text-main); }
 
-    /* Corpus Mini Box */
-    .corpus-mini-box {
-      background: var(--bg-card);
-      border: 1px solid var(--card-border);
-      border-radius: 10px; padding: 12px; font-size: 0.74rem;
-    }
+    /* Corpus */
+    .corpus-mini-box { font-size: 0.75rem; }
     .corpus-chunk-badge {
-      display: inline-block; background: rgba(56, 189, 248, 0.12); color: var(--accent);
-      border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 4px;
-      padding: 1px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; margin: 2px 2px 2px 0;
+      display: inline-block; background: var(--bg-main); color: var(--text-muted);
+      border: 1px solid var(--border-color); border-radius: 4px;
+      padding: 2px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; margin: 2px 2px 2px 0;
     }
 
-    /* Main Chat Section */
-    .chat-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: var(--bg-dark);
-      position: relative;
-      overflow: hidden;
-    }
+    /* Chat Main */
+    .chat-main { flex: 1; display: flex; flex-direction: column; background: var(--bg-main); position: relative; overflow: hidden; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 24px 20px 170px; scroll-behavior: smooth; }
+    .chat-container { max-width: 800px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 24px; }
 
-    /* Chat Messages Stream */
-    .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 24px 20px 170px;
-      scroll-behavior: smooth;
-    }
-    .chat-container {
-      max-width: 860px;
-      margin: 0 auto;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-
-    /* Empty State Hero */
-    .hero-banner {
-      text-align: center;
-      padding: 40px 20px;
-      margin-top: 20px;
-      border: 1px dashed rgba(56, 189, 248, 0.2);
-      border-radius: 16px;
-      background: rgba(15, 23, 42, 0.4);
-    }
-    .hero-icon {
-      font-size: 2.2rem; margin-bottom: 10px; display: inline-block;
-      animation: floatIcon 3s ease-in-out infinite;
-    }
-    @keyframes floatIcon {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-    }
-    .hero-title { font-size: 1.25rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
-    .hero-sub { font-size: 0.82rem; color: var(--text-muted); max-width: 580px; margin: 0 auto 18px; line-height: 1.5; }
+    /* Hero */
+    .hero-banner { text-align: center; padding: 60px 20px; margin-top: 40px; }
+    .hero-icon { margin-bottom: 16px; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; background: var(--bg-sidebar); border: 1px solid var(--border-color); color: var(--text-main); }
+    .hero-title { font-size: 1.5rem; font-weight: 600; color: var(--text-main); margin-bottom: 12px; }
+    .hero-sub { font-size: 0.9rem; color: var(--text-muted); max-width: 580px; margin: 0 auto 24px; line-height: 1.5; }
     .hero-badges { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 
-    /* Message Rows */
-    .chat-row {
-      display: flex;
-      gap: 14px;
-      animation: fadeInRow 0.22s ease-out;
-    }
-    @keyframes fadeInRow {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .chat-row.user {
-      justify-content: flex-end;
-    }
+    /* Chat Rows */
+    .chat-row { display: flex; gap: 16px; animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .chat-row.user { justify-content: flex-end; }
+    .msg-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--border-color); background: var(--bg-sidebar); color: var(--text-main); }
+    .msg-avatar.assistant { border-color: transparent; background: transparent; }
+    .msg-bubble { max-width: 80%; line-height: 1.6; }
+    .chat-row.user .msg-bubble { background: var(--user-msg-bg); border-radius: 16px; padding: 12px 16px; color: var(--text-main); font-size: 0.95rem; }
+    .chat-row.assistant .msg-bubble { flex: 1; max-width: 100%; color: var(--text-main); font-size: 0.95rem; }
+    
+    .user-msg-meta { display: none; } /* removed audio text */
 
-    .msg-avatar {
-      width: 34px; height: 34px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem; flex-shrink: 0;
-    }
-    .msg-avatar.assistant {
-      background: linear-gradient(135deg, #0284c7, #6366f1);
-      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
-    }
-    .msg-avatar.user {
-      background: #1e293b; border: 1px solid var(--card-border);
-    }
+    /* Reasoning UI */
+    .thinking-accordion { margin-bottom: 16px; font-size: 0.85rem; }
+    .thinking-header { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; color: var(--text-muted); font-weight: 500; transition: color 0.2s; }
+    .thinking-header:hover { color: var(--text-main); }
+    .thinking-status-pill { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); margin-left: 8px; }
+    .thinking-toggle-icon { width: 14px; height: 14px; transition: transform 0.2s; }
+    .thinking-accordion.collapsed .thinking-toggle-icon { transform: rotate(-90deg); }
+    .thinking-accordion.collapsed .thinking-body { display: none; }
 
-    .msg-bubble {
-      max-width: 82%;
-      border-radius: 14px;
-      padding: 14px 18px;
-      font-size: 0.88rem;
-      line-height: 1.6;
-    }
-    .chat-row.user .msg-bubble {
-      background: #1e293b;
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
-    }
-    .chat-row.assistant .msg-bubble {
-      background: var(--bg-card);
-      border: 1px solid var(--card-border);
-      color: #e2e8f0;
-      flex: 1;
-      max-width: 100%;
-    }
+    .turn-inspector-tabs { display: inline-flex; gap: 12px; margin-left: auto; margin-right: 8px; }
+    .turn-tab-btn { background: none; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 500; cursor: pointer; }
+    .turn-tab-btn:hover { color: var(--text-main); }
+    .turn-tab-btn.active { color: var(--text-main); font-weight: 600; }
 
-    /* User Message Audio Indicator */
-    .user-msg-meta {
-      display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--accent); margin-bottom: 4px; font-weight: 600;
-    }
-
-    /* ─── CLAUDE / DEEPSEEK STYLE THINKING ACCORDION ─── */
-    .thinking-accordion {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      border-radius: 12px;
-      margin-bottom: 14px;
-      overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-      transition: all 0.25s ease;
-    }
-    .thinking-accordion.active-stream {
-      border-color: var(--accent);
-      box-shadow: 0 0 16px var(--accent-glow);
-    }
-
-    .thinking-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 9px 14px;
-      cursor: pointer;
-      background: rgba(56, 189, 248, 0.05);
-      border-bottom: 1px solid rgba(56, 189, 248, 0.15);
-      user-select: none;
-      transition: background 0.2s;
-    }
-    .thinking-header:hover {
-      background: rgba(56, 189, 248, 0.09);
-    }
-    .thinking-header-left {
-      display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; color: #fff;
-    }
-    .thinking-brain-icon {
-      font-size: 1rem;
-      animation: pulseBrain 1.4s ease-in-out infinite alternate;
-    }
-    @keyframes pulseBrain {
-      0% { transform: scale(0.95); opacity: 0.8; }
-      100% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 6px #38bdf8); }
-    }
-    .thinking-status-pill {
-      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
-      padding: 2px 8px; border-radius: 6px;
-      background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);
-    }
-    .thinking-toggle-icon {
-      font-size: 0.75rem; color: var(--text-muted); transition: transform 0.2s;
-    }
-    .thinking-accordion.collapsed .thinking-toggle-icon {
-      transform: rotate(-90deg);
-    }
-
-    .turn-inspector-tabs {
-      display: inline-flex;
-      background: #0f172a;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      padding: 2px;
-      gap: 2px;
-      margin-left: auto;
-      margin-right: 8px;
-    }
-    .turn-tab-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-dim);
-      font-size: 0.68rem;
-      font-weight: 600;
-      font-family: inherit;
-      padding: 3px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .turn-tab-btn:hover {
-      color: #fff;
-    }
-    .turn-tab-btn.active {
-      background: #1e293b;
-      color: #f8fafc;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
+    .thinking-body { margin-top: 12px; padding: 12px 16px; background: var(--thought-bg); border-left: 2px solid var(--border-color); border-radius: 0 8px 8px 0; max-height: 400px; overflow-y: auto; }
     .thought-stream-pane { display: block; }
     .pipeline-trace-pane { display: none; }
 
-    .thought-stream-paragraph {
-      margin-bottom: 12px;
-      padding: 8px 12px;
-      background: rgba(15, 23, 42, 0.6);
-      border-left: 3px solid #38bdf8;
-      border-radius: 0 6px 6px 0;
-      font-size: 0.78rem;
-      line-height: 1.6;
-      color: #cbd5e1;
-      animation: thoughtSlideIn 0.2s ease-out;
-    }
-    .thought-stream-paragraph.phase-1 { border-left-color: #38bdf8; }
-    .thought-stream-paragraph.phase-2 { border-left-color: #c084fc; }
-    .thought-stream-paragraph.phase-3 { border-left-color: #fbbf24; }
-    .thought-stream-paragraph.phase-4 { border-left-color: #34d399; }
+    .thought-stream-paragraph { margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted); }
+    .thought-stream-meta { display: flex; gap: 8px; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-dim); }
+    .thought-line-break { height: 8px; }
+    .thought-code { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; background: var(--bg-main); padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-color); }
+    .thought-bullet { display: flex; gap: 8px; margin-left: 8px; margin-top: 4px; }
+    .bullet-dot { color: var(--text-dim); }
 
-    .thought-stream-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem;
-    }
-    .thought-phase-tag {
-      font-weight: 700;
-      color: #f1f5f9;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    .thought-phase-time {
-      color: var(--text-dim);
-    }
-    .thought-stream-content {
-      color: #cbd5e1;
-      font-size: 0.78rem;
-    }
-    .thought-line {
-      margin-bottom: 4px;
-    }
-    .thought-line-break {
-      height: 6px;
-    }
-    .thought-line strong {
-      color: #f1f5f9;
-      font-weight: 600;
-    }
-    .thought-code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem;
-      background: rgba(255, 255, 255, 0.06);
-      padding: 1px 4px;
-      border-radius: 3px;
-      color: #93c5fd;
-    }
-    .thought-bullet {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      margin-left: 6px;
-      margin-top: 3px;
-      color: #e2e8f0;
-    }
-    .thought-bullet .bullet-dot {
-      color: var(--accent);
-      font-weight: bold;
-    }
-
-    .thinking-body {
-      padding: 12px 14px;
-      font-size: 0.78rem;
-      line-height: 1.55;
-      max-height: 420px;
-      overflow-y: auto;
-      background: #080d19;
-    }
-    .thinking-accordion.collapsed .thinking-body {
-      display: none;
-    }
-
-    /* Thought Trace Items */
-    .thought-item {
-      position: relative;
-      padding-left: 24px;
-      margin-bottom: 12px;
-      animation: thoughtSlideIn 0.2s ease-out;
-    }
-    @keyframes thoughtSlideIn {
-      from { opacity: 0; transform: translateX(-6px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    .thought-rail {
-      position: absolute; left: 7px; top: 18px; bottom: -8px; width: 2px;
-      background: rgba(255, 255, 255, 0.08);
-    }
+    /* Timeline Items */
+    .thought-item { position: relative; padding-left: 24px; margin-bottom: 16px; }
+    .thought-rail { position: absolute; left: 7px; top: 20px; bottom: -16px; width: 2px; background: var(--border-color); }
     .thought-item:last-child .thought-rail { display: none; }
-    .thought-dot {
-      position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 50%;
-      background: #0f172a; border: 2px solid var(--accent);
-      display: flex; align-items: center; justify-content: center; font-size: 0.55rem;
-    }
-    .thought-item.fire .thought-dot { border-color: var(--success); box-shadow: 0 0 8px var(--success-glow); }
-    .thought-item.continuation .thought-dot { border-color: var(--purple); box-shadow: 0 0 8px var(--purple-glow); }
-    .thought-item.fusion .thought-dot { border-color: var(--warning); box-shadow: 0 0 8px var(--warning-glow); }
+    .thought-dot { position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--bg-sidebar); border: 2px solid var(--text-dim); display: flex; align-items: center; justify-content: center; }
+    .thought-dot svg { width: 10px; height: 10px; color: var(--text-dim); }
+    .thought-meta { display: flex; gap: 8px; margin-bottom: 4px; }
+    .thought-time { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); }
+    .thought-badge { font-size: 0.7rem; font-weight: 500; color: var(--text-dim); background: var(--bg-main); border: 1px solid var(--border-color); padding: 1px 6px; border-radius: 4px; }
+    .thought-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 4px; }
+    .thought-chunk-box { margin: 8px 0; padding: 8px 12px; background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 6px; }
+    .thought-chunk-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+    .thought-chunk-text { font-size: 0.8rem; color: var(--text-main); font-family: monospace; }
+    .thought-text { font-size: 0.85rem; color: var(--text-muted); }
+    .thought-note { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
 
-    .thought-meta {
-      display: flex; align-items: center; gap: 8px; margin-bottom: 3px;
-    }
-    .thought-time {
-      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--accent); font-weight: 700;
-    }
-    .thought-badge {
-      font-size: 0.64rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase;
-    }
-    .thought-badge-fire { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid var(--success); }
-    .thought-badge-cont { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid var(--purple); }
-    .thought-badge-fusion { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid var(--warning); }
-    .thought-badge-speech { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+    .live-thinking-indicator { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 0.4; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0.4; transform: scale(0.9); } }
 
-    .thought-title { font-size: 0.8rem; font-weight: 700; color: #fff; }
-    
-    .thought-chunk-box {
-      margin: 6px 0;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: rgba(15, 23, 42, 0.95);
-      border-left: 3px solid var(--accent);
-      border-top: 1px solid rgba(255, 255, 255, 0.04);
-      border-right: 1px solid rgba(255, 255, 255, 0.04);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    }
-    .thought-chunk-label {
-      font-size: 0.62rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.4px;
-    }
-    .thought-chunk-text {
-      font-size: 0.76rem; color: #f1f5f9; font-style: italic;
-    }
-    .thought-text { font-size: 0.76rem; color: #cbd5e1; }
-    .thought-note {
-      font-size: 0.72rem; color: #34d399; margin-top: 4px; font-weight: 600; display: flex; align-items: center; gap: 4px;
-    }
+    /* Answer */
+    .answer-text { font-size: 0.95rem; color: var(--text-main); line-height: 1.6; }
+    .answer-text p { margin-bottom: 12px; }
+    .answer-text ul, .answer-text ol { margin-left: 20px; margin-bottom: 12px; }
+    .citation-chip { background: var(--bg-sidebar); border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 4px; padding: 1px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; margin: 0 2px; }
+    .citation-chip:hover { border-color: var(--text-main); color: var(--text-main); }
 
-    /* Live Thinking Pulse indicator */
-    .live-thinking-indicator {
-      display: inline-flex; align-items: center; gap: 6px;
-      color: var(--accent); font-weight: 600; font-size: 0.75rem;
-      padding: 6px 10px; border-radius: 8px; background: rgba(56, 189, 248, 0.08);
-      margin-bottom: 8px; border: 1px dashed rgba(56, 189, 248, 0.3);
-    }
-    .pulse-dot {
-      width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
-      animation: pulseDot 1s infinite alternate;
-    }
-    @keyframes pulseDot { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.3); opacity: 1; } }
+    .verification-footer { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 8px 12px; border-radius: 6px; background: var(--bg-sidebar); font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
+    .verification-footer svg { width: 14px; height: 14px; }
 
-    /* Assistant Answer Text */
-    .answer-text {
-      font-size: 0.9rem;
-      color: #f1f5f9;
-      line-height: 1.65;
-    }
-    .answer-text p { margin-bottom: 8px; }
-    .answer-text ol, .answer-text ul { margin-left: 20px; margin-bottom: 8px; }
-
-    /* Citation Chip */
-    .citation-chip {
-      background: rgba(56, 189, 248, 0.16);
-      color: var(--accent);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 5px;
-      padding: 1px 7px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.74rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      transition: all 0.2s;
-    }
-    .citation-chip:hover {
-      background: rgba(56, 189, 248, 0.3);
-      box-shadow: 0 0 8px var(--accent-glow);
-      border-color: var(--accent);
-    }
-
-    /* Verification Footer */
-    .verification-footer {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 12px;
-      padding: 6px 12px;
-      border-radius: 8px;
-      background: rgba(16, 185, 129, 0.08);
-      border: 1px solid rgba(16, 185, 129, 0.25);
-      font-size: 0.74rem;
-      color: #34d399;
-      font-weight: 600;
-    }
-    .verification-footer.abstained {
-      background: rgba(245, 158, 11, 0.08);
-      border-color: rgba(245, 158, 11, 0.25);
-      color: #fbbf24;
-    }
-
-    /* ─── FLOATING INPUT BAR AT BOTTOM (CHATGPT STYLE) ─── */
-    .chat-input-bar {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: calc(100% - 40px);
-      max-width: 860px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 30;
-    }
-
-    /* Quick Preset Scenario Chips */
-    .quick-chips-row {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 2px;
-      scrollbar-width: none;
-    }
+    /* Input */
+    .chat-input-bar { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); width: calc(100% - 48px); max-width: 800px; display: flex; flex-direction: column; gap: 12px; z-index: 30; }
+    .quick-chips-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
     .quick-chips-row::-webkit-scrollbar { display: none; }
-    .quick-chip {
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(8px);
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .quick-chip:hover {
-      color: #fff;
-      border-color: var(--accent);
-      background: rgba(56, 189, 248, 0.1);
-      transform: translateY(-1px);
-    }
+    .quick-chip { background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.8rem; padding: 6px 12px; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .quick-chip:hover { color: var(--text-main); background: var(--bg-sidebar); border-color: var(--text-dim); }
 
-    /* Input Box */
-    .input-box-wrapper {
-      background: rgba(15, 23, 42, 0.95);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 8px 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.1);
-      display: flex;
-      align-items: flex-end;
-      gap: 10px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .input-box-wrapper:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px var(--accent-glow);
-    }
+    .input-box-wrapper { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 24px; padding: 8px 12px; display: flex; align-items: flex-end; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: border-color 0.2s, box-shadow 0.2s; }
+    .input-box-wrapper:focus-within { border-color: var(--text-dim); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 
-    .mic-action-btn {
-      width: 36px; height: 36px; border-radius: 10px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      color: var(--accent);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; flex-shrink: 0; transition: all 0.2s;
-    }
-    .mic-action-btn:hover {
-      background: rgba(56, 189, 248, 0.15); border-color: var(--accent);
-    }
-    .mic-action-btn.recording {
-      background: rgba(239, 68, 68, 0.2); border-color: var(--error); color: #f87171;
-      animation: pulseRecord 1s infinite alternate;
-    }
-    @keyframes pulseRecord { 0% { transform: scale(1); } 100% { transform: scale(1.1); box-shadow: 0 0 12px rgba(239,68,68,0.5); } }
+    .mic-action-btn { width: 32px; height: 32px; border-radius: 16px; background: transparent; border: none; color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+    .mic-action-btn:hover { background: var(--bg-sidebar); color: var(--text-main); }
+    .mic-action-btn.recording { background: #fee2e2; color: var(--error); animation: pulseMic 1.5s infinite; }
+    @keyframes pulseMic { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
-    .chat-textarea {
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: #fff;
-      font-family: inherit;
-      font-size: 0.88rem;
-      line-height: 1.5;
-      resize: none;
-      max-height: 120px;
-      padding: 6px 2px;
-    }
+    .chat-textarea { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); font-family: inherit; font-size: 1rem; line-height: 1.5; resize: none; max-height: 160px; padding: 4px 0; }
     .chat-textarea::placeholder { color: var(--text-dim); }
 
-    .send-action-btn {
-      width: 36px; height: 36px; border-radius: 10px;
-      background: linear-gradient(135deg, #0284c7, #2563eb);
-      border: none;
-      color: #fff;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; flex-shrink: 0;
-      transition: all 0.2s;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
-    }
-    .send-action-btn:hover {
-      background: linear-gradient(135deg, #0ea5e9, #3b82f6);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.45);
-    }
-    .send-action-btn:disabled {
-      opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none;
-    }
+    .send-action-btn { width: 32px; height: 32px; border-radius: 16px; background: var(--accent); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
+    .send-action-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .send-action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; background: var(--border-color); color: var(--text-dim); }
 
-    .input-caption {
-      text-align: center; font-size: 0.68rem; color: var(--text-dim);
-    }
+    .input-caption { text-align: center; font-size: 0.75rem; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .input-caption svg { width: 14px; height: 14px; }
 
-    /* Modal for BYOK Settings */
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(6px); z-index: 100;
-      display: none; align-items: center; justify-content: center; padding: 20px;
-    }
+    /* Modal */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; }
     .modal-backdrop.open { display: flex; }
-    .modal-card {
-      background: #0f172a; border: 1px solid var(--card-border);
-      border-radius: 16px; max-width: 560px; width: 100%;
-      padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-      max-height: 90vh; overflow-y: auto;
-    }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
-    .modal-title { font-size: 1.1rem; font-weight: 700; color: #fff; }
+    .modal-card { background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 12px; max-width: 520px; width: 100%; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-title { font-size: 1.1rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
     .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.25rem; cursor: pointer; }
-    .close-btn:hover { color: #fff; }
-
-    label.field-label { display: block; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
-    input.field-input, select.field-select {
-      width: 100%; background: #090e1a; border: 1px solid var(--card-border);
-      border-radius: 8px; color: #fff; padding: 8px 10px; font-size: 0.8rem;
-      margin-bottom: 10px; outline: none; transition: border-color 0.2s;
-    }
+    .close-btn:hover { color: var(--text-main); }
+    label.field-label { display: block; font-size: 0.8rem; color: var(--text-main); margin-bottom: 6px; font-weight: 500; }
+    input.field-input, select.field-select { width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); padding: 10px 12px; font-size: 0.9rem; margin-bottom: 16px; outline: none; transition: border-color 0.2s; }
     input.field-input:focus, select.field-select:focus { border-color: var(--accent); }
+
   </style>
 </head>
 <body>
 
   <!-- Top Header Nav -->
+  
   <header>
     <div class="brand">
-      <div class="brand-logo">⚡</div>
+      <div class="brand-logo"><i data-lucide="zap" width="16" height="16"></i></div>
       <div>
-        <div class="brand-title">Streaming Live RAG <span class="pill pill-blue">Theme 4</span></div>
-        <div class="brand-sub">Samsung PRISM GenAI Hackathon · Speculative Retrieval &amp; Continuous Thought</div>
+        <div class="brand-title">Streaming Live RAG <span class="pill">Theme 4</span></div>
+        <div class="brand-sub">Samsung PRISM GenAI Hackathon</div>
       </div>
     </div>
     <div class="header-actions">
-      <span class="pill pill-green" id="apiStatusPill"><span class="pill-dot"></span> Pipeline Ready</span>
-      <span class="pill pill-blue" id="corpusPill"><span class="pill-dot"></span> 4 Chunks Indexed</span>
-      <button class="header-btn" onclick="openByokModal()">⚙️ Settings</button>
-      <button class="header-btn" onclick="reseedCorpus()">🔄 Reseed Dev Data</button>
+      <span class="pill pill-green active" id="apiStatusPill"><span class="pill-dot"></span> Pipeline Ready</span>
+      <span class="pill pill-blue active" id="corpusPill"><span class="pill-dot"></span> 4 Chunks Indexed</span>
+      <button class="header-btn" onclick="toggleTheme()" title="Toggle Theme"><i data-lucide="sun-moon" width="16" height="16"></i></button>
+      <button class="header-btn outline" onclick="openByokModal()"><i data-lucide="settings" width="14" height="14"></i> Settings</button>
+      <button class="header-btn outline" onclick="reseedCorpus()"><i data-lucide="refresh-cw" width="14" height="14"></i> Reseed Data</button>
     </div>
   </header>
+
 
   <!-- App Layout -->
   <div class="app-container">
 
     <!-- Sidebar -->
+    
     <div class="sidebar">
 
-      <!-- Live Stream Mode Switch Card -->
       <div class="live-toggle-card">
         <div class="live-toggle-row">
           <div class="live-toggle-title">
-            <span>🔴 Live Stream Mode</span>
+            <i data-lucide="radio" width="16" height="16" style="color:var(--error);"></i> Live Stream Mode
           </div>
           <label class="switch">
             <input type="checkbox" id="liveModeToggle" checked onchange="toggleLiveMode(this.checked)">
@@ -804,24 +336,22 @@
           </label>
         </div>
         <div class="live-toggle-sub">
-          When <strong>ON</strong>: Evaluates speech and typing dynamically. Fires speculative background retrieval as data arrives and continues thinking without resetting!
+          Evaluates speech and typing dynamically. Continues thinking without resetting.
         </div>
       </div>
 
-      <!-- Session Info -->
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div style="font-size:0.75rem; color:var(--text-muted);">
-          Session: <code id="lblSession" style="color:var(--accent);">session_demo_01</code>
+          Session: <code id="lblSession" style="color:var(--text-main);">session_demo_01</code>
         </div>
-        <button class="header-btn" onclick="clearSessionHistory()" style="padding:4px 8px; font-size:0.7rem;">
-          + New Chat
+        <button class="header-btn outline" onclick="clearSessionHistory()" style="padding:4px 8px; font-size:0.7rem;">
+          <i data-lucide="plus" width="12" height="12"></i> New Chat
         </button>
       </div>
 
-      <!-- Telemetry HUD Mini -->
       <div>
         <div class="sidebar-section-title">
-          <span>📊 Live Telemetry HUD</span>
+          <span style="display:flex; align-items:center; gap:6px;"><i data-lucide="bar-chart-2" width="14" height="14"></i> Session Stats</span>
         </div>
         <div class="hud-mini-grid">
           <div class="hud-mini-card">
@@ -843,82 +373,71 @@
         </div>
       </div>
 
-      <!-- Benchmark Scenarios -->
       <div>
         <div class="sidebar-section-title">
-          <span>🎯 Benchmark Scenarios</span>
-          <span style="font-size:0.65rem; color:var(--text-dim);">1-Click Test</span>
+          <span style="display:flex; align-items:center; gap:6px;"><i data-lucide="target" width="14" height="14"></i> Benchmark Scenarios</span>
         </div>
-
         <div class="scenario-item" onclick="loadAndRunScenario(1)">
           <div class="scenario-top">
-            <span class="scenario-title">⚡ 1. Early Retrieval (Gate G2)</span>
-            <span class="scenario-tag" style="background:rgba(56,189,248,0.2); color:#38bdf8;">Speculative</span>
+            <span class="scenario-title"><i data-lucide="zap" width="12" height="12"></i> 1. Early Retrieval (G2)</span>
+            <span class="scenario-tag">Speculative</span>
           </div>
           <div class="scenario-query">"What is the maximum capacity of the workshop hall?"</div>
         </div>
-
         <div class="scenario-item active" onclick="loadAndRunScenario(2)">
           <div class="scenario-top">
-            <span class="scenario-title">🔀 2. Multi-Intent Compound (G3)</span>
-            <span class="scenario-tag" style="background:rgba(168,85,247,0.2); color:#c084fc;">3 Parallel Beams</span>
+            <span class="scenario-title"><i data-lucide="shuffle" width="12" height="12"></i> 2. Multi-Intent (G3)</span>
+            <span class="scenario-tag">3 Beams</span>
           </div>
-          <div class="scenario-query">"What is the venue capacity, what is the cancellation penalty, and who approves international travel?"</div>
+          <div class="scenario-query">"What is the venue capacity, what is the cancellation penalty..."</div>
         </div>
-
         <div class="scenario-item" onclick="loadAndRunScenario(3)">
           <div class="scenario-top">
-            <span class="scenario-title">💬 3. Chit-Chat Suppression (C2)</span>
-            <span class="scenario-tag" style="background:rgba(16,185,129,0.2); color:#34d399;">0 Retrieval</span>
+            <span class="scenario-title"><i data-lucide="message-square" width="12" height="12"></i> 3. Chit-Chat (C2)</span>
+            <span class="scenario-tag">0 Retrieval</span>
           </div>
           <div class="scenario-query">"Hello! Can you help me today?"</div>
         </div>
-
         <div class="scenario-item" onclick="loadAndRunScenario(4)">
           <div class="scenario-top">
-            <span class="scenario-title">📋 4. Presentation Reformat (C4)</span>
-            <span class="scenario-tag" style="background:rgba(245,158,11,0.2); color:#fbbf24;">Cache Reformat</span>
+            <span class="scenario-title"><i data-lucide="list" width="12" height="12"></i> 4. Reformat (C4)</span>
+            <span class="scenario-tag">Cache</span>
           </div>
           <div class="scenario-query">"Can you format that in two bullet points?"</div>
         </div>
-
         <div class="scenario-item" onclick="loadAndRunScenario(5)">
           <div class="scenario-top">
-            <span class="scenario-title">🔄 5. Late-Detail Refinement (C7)</span>
-            <span class="scenario-tag" style="background:rgba(56,189,248,0.2); color:#38bdf8;">Version +1</span>
+            <span class="scenario-title"><i data-lucide="edit-3" width="12" height="12"></i> 5. Refinement (C7)</span>
+            <span class="scenario-tag">v2</span>
           </div>
           <div class="scenario-query">"Actually, what if there are 50 attendees?"</div>
         </div>
-
         <div class="scenario-item" onclick="loadAndRunScenario(6)">
           <div class="scenario-top">
-            <span class="scenario-title">🛡️ 6. Out-of-Corpus Abstention (C6)</span>
-            <span class="scenario-tag" style="background:rgba(239,68,68,0.2); color:#f87171;">Hallucination Guard</span>
+            <span class="scenario-title"><i data-lucide="shield" width="12" height="12"></i> 6. Abstention (C6)</span>
+            <span class="scenario-tag">Guard</span>
           </div>
           <div class="scenario-query">"What is the domestic train meal allowance in Mumbai?"</div>
         </div>
       </div>
 
-      <!-- Corpus Overview -->
-      <div>
-        <div class="sidebar-section-title">
-          <span>📁 Indexed Corpus</span>
-          <button onclick="refreshCorpus()" style="background:none; border:none; color:var(--accent); font-size:0.68rem; cursor:pointer;">[Refresh]</button>
-        </div>
+      <details open>
+        <summary class="sidebar-section-title" style="cursor: pointer; list-style: none;">
+          <span style="display:flex; align-items:center; gap:6px;"><i data-lucide="chevron-down" width="14" height="14"></i><i data-lucide="folder" width="14" height="14"></i> Indexed Corpus</span>
+          <button onclick="refreshCorpus(); event.preventDefault();" style="background:none; border:none; color:var(--text-muted); cursor:pointer;"><i data-lucide="refresh-cw" width="12" height="12"></i></button>
+        </summary>
         <div class="corpus-mini-box">
           <div id="corpusSummaryText" style="margin-bottom:6px; color:var(--text-muted);">Loading corpus data...</div>
           <div id="corpusDocsList"></div>
-          <div style="margin-top:10px; border-top:1px solid var(--card-border); padding-top:8px;">
+          <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
             <input type="file" id="docUploadInput" style="display:none;" onchange="handleFileUpload(event)" accept=".pdf,.docx,.pptx,.xlsx,.csv,.tsv,.json,.yaml,.yml,.html,.htm,.txt,.md" />
-            <button class="header-btn" onclick="document.getElementById('docUploadInput').click()" style="width:100%; justify-content:center; padding:6px;">
-              📤 Upload Custom File
+            <button class="header-btn outline" onclick="document.getElementById('docUploadInput').click()" style="width:100%; justify-content:center; padding:6px;">
+              <i data-lucide="upload" width="14" height="14"></i> Upload Custom File
             </button>
           </div>
         </div>
-      </div>
-
+      </details>
     </div>
-
     <!-- Main Chat Thread -->
     <div class="chat-main">
 
@@ -928,7 +447,17 @@
 
           <!-- Hero Greeting -->
           <div class="hero-banner" id="heroBanner">
-            <div class="hero-icon">⚡</div>
+            <div class="hero-icon"><i data-lucide="zap" width="24" height="24"></i></div>
+            <div class="hero-title">Streaming Live Speech RAG</div>
+            <div class="hero-sub">
+              Experience real-time speculative search with uninterrupted continuous thought. Speak into the microphone or test a benchmark scenario below.
+            </div>
+            <div class="hero-badges">
+              <span class="pill">Speculative Pre-Retrieval</span>
+              <span class="pill">Continuous Thought</span>
+              <span class="pill">100% Grounded</span>
+            </div>
+          </div>
             <div class="hero-title">Streaming Live Speech RAG</div>
             <div class="hero-sub">
               Experience real-time speculative search with uninterrupted continuous thought. Speak into the microphone or test a benchmark scenario below to watch the thinking process unfold!
@@ -945,70 +474,59 @@
 
       <!-- Floating Bottom Input Bar (ChatGPT style) -->
       <div class="chat-input-bar">
-
-        <!-- Quick Scenario Chips -->
         <div class="quick-chips-row">
-          <div class="quick-chip" onclick="loadAndRunScenario(2)">🔀 Scenario 2: Multi-Intent (3 Beams)</div>
-          <div class="quick-chip" onclick="loadAndRunScenario(1)">⚡ Scenario 1: Early Retrieval</div>
-          <div class="quick-chip" onclick="loadAndRunScenario(3)">💬 Scenario 3: Chit-Chat (0 Retrieval)</div>
-          <div class="quick-chip" onclick="loadAndRunScenario(4)">📋 Scenario 4: Reformat Cache</div>
-          <div class="quick-chip" onclick="loadAndRunScenario(5)">🔄 Scenario 5: Refinement v2</div>
-          <div class="quick-chip" onclick="loadAndRunScenario(6)">🛡️ Scenario 6: Abstention</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(2)"><i data-lucide="shuffle" width="14" height="14"></i> Multi-Intent</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(1)"><i data-lucide="zap" width="14" height="14"></i> Early Retrieval</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(3)"><i data-lucide="message-square" width="14" height="14"></i> Chit-Chat</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(4)"><i data-lucide="list" width="14" height="14"></i> Reformat</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(5)"><i data-lucide="edit-3" width="14" height="14"></i> Refinement</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(6)"><i data-lucide="shield" width="14" height="14"></i> Abstention</div>
         </div>
 
-        <!-- Chat Input Console -->
         <div class="input-box-wrapper">
           <button class="mic-action-btn" id="micBtn" title="Speak into Microphone" onclick="toggleSpeechRecognition()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            <i data-lucide="mic" width="18" height="18"></i>
           </button>
-
-          <textarea id="chatInput" class="chat-textarea" rows="1" placeholder="Ask a question or speak into microphone (Live Stream is ON)..." onkeydown="handleInputKey(event)"></textarea>
-
+          <textarea id="chatInput" class="chat-textarea" rows="1" placeholder="Ask a question or speak into microphone..." onkeydown="handleInputKey(event)"></textarea>
           <button class="send-action-btn" id="sendBtn" title="Send message" onclick="submitUserMessage()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <i data-lucide="arrow-up" width="18" height="18"></i>
           </button>
         </div>
 
         <div class="input-caption" id="inputCaption">
-          ⚡ <strong>Live Stream ON:</strong> As speech or typing streams in, speculative searches trigger in background and continuations are absorbed seamlessly into thought.
+          <i data-lucide="radio" width="12" height="12"></i> <strong>Live Stream ON:</strong> Evaluates speech dynamically.
         </div>
-
       </div>
-
     </div>
-
   </div>
-
   <!-- Modal: BYOK Provider Configuration -->
   <div class="modal-backdrop" id="byokModal">
     <div class="modal-card">
       <div class="modal-header">
-        <div class="modal-title">⚙️ LLM Provider Settings (BYOK)</div>
-        <button class="close-btn" onclick="closeByokModal()">&times;</button>
+        <div class="modal-title"><i data-lucide="settings" width="18" height="18"></i> LLM Provider Settings (BYOK)</div>
+        <button class="close-btn" onclick="closeByokModal()"><i data-lucide="x" width="20" height="20"></i></button>
       </div>
 
-      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:14px;">
-        Configure third-party providers (Groq, Google Gemini, Ollama, NVIDIA NIM, OpenAI). Keys are write-only.
+      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:20px;">
+        Configure third-party providers. Keys are write-only.
       </div>
 
-      <div style="margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--card-border);">
-        <label class="field-label" style="color:var(--accent);">⚡ Fast Controller / Decomposer Provider</label>
+      <div style="margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border-color);">
+        <label class="field-label">Fast Controller / Decomposer Provider</label>
         <select id="mFastProvider" class="field-select">
           <option value="groq">Groq (Default Cloud Fast)</option>
           <option value="ollama">Ollama (Local / Offline)</option>
           <option value="nvidia">NVIDIA NIM</option>
           <option value="openai">OpenAI</option>
         </select>
-
         <label class="field-label">Fast Model</label>
         <input type="text" id="mFastModel" class="field-input" value="openai/gpt-oss-20b" />
-
-        <label class="field-label">Fast API Key (Write-Only)</label>
+        <label class="field-label">Fast API Key</label>
         <input type="password" id="mFastApiKey" class="field-input" placeholder="Enter new key to update..." />
       </div>
 
-      <div style="margin-bottom:14px;">
-        <label class="field-label" style="color:var(--success);">🧠 Quality Synthesis Provider</label>
+      <div style="margin-bottom:20px;">
+        <label class="field-label">Quality Synthesis Provider</label>
         <select id="mSynthProvider" class="field-select">
           <option value="gemini">Google Gemini (Default)</option>
           <option value="nvidia">NVIDIA NIM</option>
@@ -1016,24 +534,74 @@
           <option value="ollama">Ollama</option>
           <option value="openai">OpenAI</option>
         </select>
-
         <label class="field-label">Synthesis Model</label>
         <input type="text" id="mSynthModel" class="field-input" value="gemini-3.5-flash-lite" />
-
-        <label class="field-label">Synthesis API Key (Write-Only)</label>
+        <label class="field-label">Synthesis API Key</label>
         <input type="password" id="mSynthApiKey" class="field-input" placeholder="Enter new key to update..." />
       </div>
 
-      <div id="modalStatus" style="display:none; font-size:0.75rem; padding:8px; border-radius:8px; margin-bottom:12px;"></div>
+      <div id="modalStatus" style="display:none; font-size:0.85rem; padding:10px; border-radius:6px; margin-bottom:16px;"></div>
 
-      <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button class="header-btn" onclick="testModalProviders()">Test Connection</button>
-        <button class="header-btn" onclick="saveModalConfig()" style="background:var(--accent); color:#000; border-color:var(--accent); font-weight:700;">Save &amp; Apply</button>
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <button class="header-btn outline" onclick="testModalProviders()">Test Connection</button>
+        <button class="header-btn primary" onclick="saveModalConfig()">Save &amp; Apply</button>
       </div>
     </div>
   </div>
-
   <script>
+    
+    // ─── THEME ─────────────────────────────────────────────
+    function toggleTheme() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+      localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    }
+    // init theme
+    if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+
+    // ─── MARKED CONFIGURATION ────────────────────────────────────────
+    marked.use({
+      renderer: {
+        code: function(codeObj, language, isEscaped) {
+          let codeText = codeObj;
+          let lang = language;
+          if (typeof codeObj === 'object') { // marked v14+ signature
+            codeText = codeObj.text;
+            lang = codeObj.lang;
+          }
+          const validLanguage = lang || 'code';
+          const escapedCode = codeText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          return `
+            <div class="code-container" style="margin: 16px 0; background-color: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+              <div style="display: flex; justify-content: space-between; align-items: center; background-color: rgba(0,0,0,0.03); padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+                <span>${validLanguage}</span>
+                <button onclick="copyCode(this)" style="background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; gap: 4px; padding: 0;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  <span>Copy code</span>
+                </button>
+              </div>
+              <pre style="margin: 0; padding: 16px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-main);"><code>${escapedCode}</code></pre>
+            </div>
+          `;
+        }
+      }
+    });
+
+    function copyCode(button) {
+      const pre = button.closest('.code-container').querySelector('pre code');
+      const text = pre.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const span = button.querySelector('span');
+        const origText = span.innerText;
+        span.innerText = 'Copied!';
+        setTimeout(() => span.innerText = origText, 2000);
+      });
+    }
+
     // ─── STATE MANAGEMENT ─────────────────────────────────────────────
     const state = {
       sessionId: 'session_demo_01',
@@ -1094,7 +662,17 @@
       document.getElementById('hudIntents').innerText = '0 Intents';
       document.getElementById('chatThread').innerHTML = `
         <div class="hero-banner" id="heroBanner">
-          <div class="hero-icon">⚡</div>
+            <div class="hero-icon"><i data-lucide="zap" width="24" height="24"></i></div>
+            <div class="hero-title">Streaming Live Speech RAG</div>
+            <div class="hero-sub">
+              Experience real-time speculative search with uninterrupted continuous thought. Speak into the microphone or test a benchmark scenario below.
+            </div>
+            <div class="hero-badges">
+              <span class="pill">Speculative Pre-Retrieval</span>
+              <span class="pill">Continuous Thought</span>
+              <span class="pill">100% Grounded</span>
+            </div>
+          </div>
           <div class="hero-title">Streaming Live Speech RAG</div>
           <div class="hero-sub">
             Session reset! Speak into the microphone or test a benchmark scenario to watch the continuous thought engine in action.
@@ -1204,7 +782,7 @@
           </div>
           <span class="user-text-content">${esc(text)}</span>
         </div>
-        <div class="msg-avatar user">👤</div>
+        <div class="msg-avatar user"><i data-lucide="user" width="16" height="16"></i></div>
       `;
       thread.appendChild(row);
       scrollToBottom();
@@ -1217,13 +795,13 @@
       row.className = 'chat-row assistant';
 
       row.innerHTML = `
-        <div class="msg-avatar assistant">⚡</div>
+        <div class="msg-avatar assistant"><i data-lucide="cpu" width="18" height="18"></i></div>
         <div class="msg-bubble">
           <!-- Collapsible Thinking Process Box (Editorial / Lab style) -->
           <div class="thinking-accordion active-stream" id="curThinkingAccordion">
             <div class="thinking-header" onclick="toggleThinkingBox(this.parentElement)">
               <div class="thinking-header-left">
-                <span class="thinking-brain-icon">🧠</span>
+                <span class="thinking-brain-icon"><i data-lucide="activity" width="14" height="14"></i></span>
                 <span>Thought stream</span>
                 <span class="thinking-status-pill" id="curThinkingClock">Thinking (0.0s)...</span>
               </div>
@@ -1231,7 +809,7 @@
                 <button type="button" class="turn-tab-btn active" data-tab="thought">Thought stream</button>
                 <button type="button" class="turn-tab-btn" data-tab="trace">Pipeline trace</button>
               </div>
-              <div class="thinking-toggle-icon">▼</div>
+              <div class="thinking-toggle-icon"><i data-lucide="chevron-down" width="14" height="14"></i></div>
             </div>
             <div class="thinking-body" id="curThinkingBody">
               <!-- Pane 1: Thought stream (default) -->
@@ -1366,10 +944,11 @@
       // client-side, server-side, or a dropped connection in between.
       ctx.turnTimeout = setTimeout(() => onTurnTimeout(ctx), TURN_TIMEOUT_MS);
       state.activeTurn = ctx;
+      setTimeout(() => lucide.createIcons(), 0);
       return ctx;
     }
 
-    const TURN_TIMEOUT_MS = 60000;
+    const TURN_TIMEOUT_MS = 180000;
 
     function onTurnTimeout(ctx) {
       if (state.activeTurn !== ctx) return; // turn already resolved/replaced
@@ -1377,11 +956,11 @@
       ctx.turnTimeout = null;
       if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
       if (ctx.thinkingAccordion) ctx.thinkingAccordion.classList.remove('active-stream');
-      if (ctx.thinkingClock) ctx.thinkingClock.innerText = 'Timed out after 60s';
+      if (ctx.thinkingClock) ctx.thinkingClock.innerText = 'Timed out after 180s';
       if (ctx.answerContainer) {
         ctx.answerContainer.innerHTML = `
           <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
-            ⏱️ Turn exceeded the 60s limit and was aborted.
+            ⏱️ Turn exceeded the 180s limit and was aborted.
           </div>
         `;
       }
@@ -1464,6 +1043,7 @@
         ${item.note ? `<div class="thought-note">${item.note}</div>` : ''}
       `;
       ctx.traceList.appendChild(div);
+      setTimeout(() => lucide.createIcons(), 0);
       scrollToBottom();
     }
 
@@ -1885,7 +1465,7 @@
         const isTimeout = Boolean(err) && err.name === 'AbortError';
         ctx.answerContainer.innerHTML = isTimeout ? `
           <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
-            ⏱️ Turn exceeded the 60s limit and was aborted.
+            ⏱️ Turn exceeded the 180s limit and was aborted.
           </div>
         ` : `
           <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
@@ -2008,14 +1588,20 @@
     async function streamAnswerTypewriter(container, answerText) {
       if (!container) return;
       container.innerHTML = '';
-      const formatted = esc(answerText).replace(/\[(Doc_\d+\s*§[\w.\-]+)\]/g, '<span class="citation-chip" onclick="copyCitationTag(\'$1\', this)" title="Click to copy citation tag">[$1]</span>');
       
-      const tokens = formatted.split(/(\s+|<span[^>]*>.*?<\/span>)/g).filter(Boolean);
+      const tokens = answerText.split(/(\s+)/).filter(Boolean);
       let buffer = '';
 
       for (let i = 0; i < tokens.length; i++) {
         buffer += tokens[i];
-        container.innerHTML = buffer;
+        
+        // Parse current markdown buffer to HTML
+        let htmlBuffer = marked.parse(buffer);
+        
+        // Replace citations with interactive chips
+        htmlBuffer = htmlBuffer.replace(/\[(Doc_\d+(?:\s*§\s*[\w.\-]+)?)\]/g, '<span class="citation-chip" onclick="copyCitationTag(\'$1\', this)" title="Click to copy citation tag">[$1]</span>');
+        
+        container.innerHTML = htmlBuffer;
         scrollToBottom();
         await new Promise(r => setTimeout(r, 14));
       }
@@ -2278,6 +1864,7 @@
     // Initialize
     refreshCorpus();
     connectWs();
+    lucide.createIcons();
   </script>
 </body>
 </html>

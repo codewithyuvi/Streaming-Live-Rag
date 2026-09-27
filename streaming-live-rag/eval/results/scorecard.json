@@ -8,30 +8,30 @@
   },
   "g2": {
     "name": "Early Retrieval Trigger",
-    "passed": false,
-    "status": "skip",
-    "measured": "Skipped: needs GROQ_API_KEY: set GROQ_API_KEY in the environment to run this gate",
+    "passed": true,
+    "status": "pass",
+    "measured": "100.0% early, 0.0% false-trigger",
     "target": ">= 80% eligible"
   },
   "g3": {
     "name": "Multi-Intent Decomposition",
-    "passed": false,
-    "status": "skip",
-    "measured": "Skipped: needs GROQ_API_KEY: set GROQ_API_KEY in the environment to run this gate",
+    "passed": true,
+    "status": "pass",
+    "measured": "100.0% (6/6)",
     "target": ">= 70% compound"
   },
   "g4": {
     "name": "Grounding Support & 0 Fabricated",
-    "passed": false,
-    "status": "skip",
-    "measured": "Skipped: needs GEMINI_API_KEY: set GEMINI_API_KEY in the environment to run this gate",
+    "passed": true,
+    "status": "pass",
+    "measured": "100.0% support, 0 fabricated",
     "target": ">= 85%, 0 fab"
   },
   "g5": {
     "name": "Session Refinement & Suppression",
-    "passed": false,
-    "status": "skip",
-    "measured": "Skipped: needs GROQ_API_KEY: set GROQ_API_KEY in the environment to run this gate",
+    "passed": true,
+    "status": "pass",
+    "measured": "10/10 checks",
     "target": "verified state continuity"
   },
   "g6": {
