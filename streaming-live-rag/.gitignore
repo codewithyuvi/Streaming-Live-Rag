@@ -1,4 +1,4 @@
-﻿.env
+.env
 __pycache__/
 *.py[cod]
 *$py.class
@@ -8,3 +8,5 @@ __pycache__/
 venv/
 .venv/
 logs/*.jsonl
+*.zip
+qdrant_storage/

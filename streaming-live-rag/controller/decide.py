@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import re
 
 # Ensure parent directory is on sys.path for llm_config import
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -8,9 +9,9 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 try:
-    from llm_config import call_fast, FAST_LLM_MODEL
+    from llm_config import call_fast
 except ImportError:
-    from ..llm_config import call_fast, FAST_LLM_MODEL
+    from ..llm_config import call_fast
 
 def decide_retrieval(partial_utterance: str) -> dict:
     """
@@ -32,11 +33,11 @@ def decide_retrieval(partial_utterance: str) -> dict:
     Rules for Triggering:
     1. retrieve_now (AGGRESSIVE EARLY RETRIEVAL): 
        Trigger AS SOON AS a strong entity, noun phrase, or clear search intent is visible, EVEN IF the sentence is grammatically incomplete. 
-       - "What is the maximum capacity of" -> retrieve_now (keyword "maximum capacity")
-       - "I need to travel to Pune for the" -> retrieve_now ("travel to Pune")
-       - "Who needs to approve international" -> retrieve_now ("approve international")
-       - "What is the hotel" -> retrieve_now (keyword "hotel")
-       - "Who handles the projector" -> retrieve_now (keyword "projector")
+       - "What is the maximum capacity" -> retrieve_now (keyword "maximum capacity")
+       - "I need to travel to Pune" -> retrieve_now ("travel to Pune")
+       - "Who needs to approve international travel" -> retrieve_now ("approve international travel")
+       - "What is the hotel reimbursement limit" -> retrieve_now (keyword "hotel reimbursement limit")
+       - "Who handles the projector remote" -> retrieve_now (keyword "projector remote")
     
     2. no_retrieval_needed (CONVERSATIONAL / PRESENTATION):
        Trigger for greetings, pleasantries, generic requests for help, or meeting management chatter where no factual lookup is needed.
@@ -48,6 +49,7 @@ def decide_retrieval(partial_utterance: str) -> dict:
        - "Give me the" -> wait.
     """
     
+    response = None
     try:
         response = call_fast(
             messages=[
@@ -56,15 +58,42 @@ def decide_retrieval(partial_utterance: str) -> dict:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=150
+            max_tokens=400
         )
     except Exception as e:
-        return {"trigger": "wait", "reason": f"Fallback due to api error: {str(e)}", "degraded": True}
-    
+        try:
+            response = call_fast(
+                messages=[
+                    {"role": "system", "content": system_prompt + "\nOutput strictly valid JSON with no markdown formatting."},
+                    {"role": "user", "content": partial_utterance}
+                ],
+                temperature=0.0,
+                max_tokens=400
+            )
+        except Exception as e2:
+            return {"trigger": "wait", "reason": f"Fallback due to api error: {str(e2)}", "degraded": True}
+
     try:
-        decision = json.loads(response.choices[0].message.content)
-        if decision.get("trigger") not in ["wait", "retrieve_now", "no_retrieval_needed"]:
-            decision["trigger"] = "wait"
+        raw_text = response.choices[0].message.content.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
+        try:
+            decision = json.loads(raw_text)
+        except Exception:
+            m = re.search(r"\{.*\}", raw_text, re.DOTALL)
+            if m:
+                decision = json.loads(m.group(0))
+            else:
+                raise
+        trigger = decision.get("trigger")
+        # Normalize spec alias: ARCHITECTURE_BRIEF uses `trigger_now`,
+        # runtime historically used `retrieve_now`. Accept both.
+        if trigger == "trigger_now":
+            trigger = "retrieve_now"
+        if trigger not in ["wait", "retrieve_now", "no_retrieval_needed"]:
+            trigger = "wait"
+        decision["trigger"] = trigger
         return decision
     except Exception as e:
         return {"trigger": "wait", "reason": f"Fallback due to parse error: {str(e)}", "degraded": True}

@@ -1,4 +1,4 @@
-﻿"""
+"""
 session/store.py — Ephemeral Session Store with Clean Commit Semantics (C4 / C7 / M1 / Appendix B.3).
 
 Tracks:
@@ -8,8 +8,10 @@ Tracks:
 - Non-corrupting PRESENTATION_ONLY audit tracking
 """
 
+import threading as _threading
+import time as _time
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 
 @dataclass
@@ -44,6 +46,7 @@ class Session:
     current_answer: str = ""                               # last substantive answer -- never overwritten by chit-chat
     current_citations: list[str] = field(default_factory=list)
     answer_version: int = 0
+    _next_turn_id: int = 1
 
     def commit(
         self,
@@ -60,7 +63,8 @@ class Session:
         - LATE_DETAIL: Updates answer/query, unions citations, increments version += 1.
         - PRESENTATION_ONLY: Records turn in audit trail only. Current state and version stay untouched.
         """
-        turn_id = len(self.turns) + 1
+        turn_id = self._next_turn_id
+        self._next_turn_id += 1
         record = TurnRecord(
             turn_id=turn_id,
             utterance=utterance,
@@ -71,6 +75,9 @@ class Session:
             effective_query=effective_query or utterance,
         )
         self.turns.append(record)
+        # Cap audit trail to last 50 turns to prevent memory growth under extended use
+        if len(self.turns) > 50:
+            self.turns = self.turns[-50:]
 
         if kind == "NEW_TOPIC":
             self.current_query = effective_query or utterance
@@ -101,22 +108,36 @@ class Session:
         """Returns the most recent turn record, or None if no turns yet."""
         return self.turns[-1] if self.turns else None
 
-    def get_history_context(self, max_turns: int = 5) -> str:
+    def get_history_context(self, max_turns: int = 5, max_chars_per_answer: int = 1500) -> str:
         """
         Returns a formatted string of recent substantive conversation history
         for injection into the synthesis prompt.
+        Answers are truncated at a sentence/word boundary so one long turn
+        cannot blow up the prompt or smuggle prompt-injection payloads.
         """
         recent = self.turns[-max_turns:]
         if not recent:
             return ""
 
+        def _truncate(text: str, limit: int) -> str:
+            if len(text) <= limit:
+                return text
+            cut = text[:limit]
+            # Prefer a sentence boundary, else a word boundary.
+            for sep in (". ", "? ", "! ", "\n"):
+                idx = cut.rfind(sep)
+                if idx > limit // 2:
+                    return cut[: idx + 1].strip()
+            space = cut.rfind(" ")
+            return (cut[:space] if space > limit // 2 else cut).strip() + " …"
+
         lines = []
         for t in recent:
-            lines.append(f"[Turn {t.turn_id}] User: {t.utterance}")
+            lines.append(f"[Turn {t.turn_id}] User: {t.utterance[:500]}")
             # Do not truncate mid-sentence; include full answer or reasonable paragraph
-            lines.append(f"[Turn {t.turn_id}] Assistant: {t.answer}")
+            lines.append(f"[Turn {t.turn_id}] Assistant: {_truncate(t.answer, max_chars_per_answer)}")
             if t.citations:
-                lines.append(f"[Turn {t.turn_id}] Citations: {', '.join(t.citations)}")
+                lines.append(f"[Turn {t.turn_id}] Citations: {', '.join(t.citations[:8])}")
         return "\n".join(lines)
 
     def get_all_prior_citations(self) -> list[str]:
@@ -128,29 +149,79 @@ class Session:
 
 
 # ---------------------------------------------------------------------------
-# Global ephemeral session store
+# Global ephemeral session store (thread-safe, TTL-evicted)
 # ---------------------------------------------------------------------------
 
 _sessions: dict[str, Session] = {}
+_sessions_lock = _threading.Lock()
+_sessions_last_access: dict[str, float] = {}
+_SESSION_TTL_S = 3600.0  # evict idle sessions after 1h
+_MAX_SESSIONS = 1000
+# Per-session locks guard Session.commit / get_history_context so concurrent
+# /turn requests for the same session_id cannot interleave turns, citations,
+# or answer_version updates.
+_session_locks: dict[str, _threading.Lock] = {}
+
+
+def _evict_expired_locked(now: float | None = None) -> None:
+    now = now if now is not None else _time.time()
+    expired = [k for k, ts in _sessions_last_access.items() if now - ts > _SESSION_TTL_S]
+    for k in expired:
+        if k in _session_locks and _session_locks[k].locked():
+            continue  # Never evict a session whose lock is currently acquired by an active turn
+        _sessions.pop(k, None)
+        _sessions_last_access.pop(k, None)
+        _session_locks.pop(k, None)
+    # Hard cap: drop oldest if over limit
+    if len(_sessions) > _MAX_SESSIONS:
+        oldest = sorted(_sessions_last_access.items(), key=lambda kv: kv[1])
+        for k, _ in oldest:
+            if len(_sessions) <= _MAX_SESSIONS:
+                break
+            if k in _session_locks and _session_locks[k].locked():
+                continue
+            _sessions.pop(k, None)
+            _sessions_last_access.pop(k, None)
+            _session_locks.pop(k, None)
+
+
+def get_session_lock(session_id: str) -> "_threading.Lock":
+    """Return the mutex serializing mutations for one session."""
+    with _sessions_lock:
+        lock = _session_locks.get(session_id)
+        if lock is None:
+            lock = _threading.Lock()
+            _session_locks[session_id] = lock
+        return lock
 
 
 def get_or_create_session(session_id: str) -> Session:
     """Get existing session or create a new one."""
-    if session_id not in _sessions:
-        _sessions[session_id] = Session(session_id=session_id)
-    return _sessions[session_id]
+    with _sessions_lock:
+        _evict_expired_locked()
+        if session_id not in _sessions:
+            _sessions[session_id] = Session(session_id=session_id)
+        _sessions_last_access[session_id] = _time.time()
+        return _sessions[session_id]
 
 
 def delete_session(session_id: str) -> bool:
     """Delete a session. Returns True if it existed."""
-    return _sessions.pop(session_id, None) is not None
+    with _sessions_lock:
+        _sessions_last_access.pop(session_id, None)
+        _session_locks.pop(session_id, None)
+        return _sessions.pop(session_id, None) is not None
 
 
 def list_sessions() -> list[str]:
     """List all active session IDs."""
-    return list(_sessions.keys())
+    with _sessions_lock:
+        return list(_sessions.keys())
 
 
 def reset_store():
     """Clears all sessions (useful for tests)."""
-    _sessions.clear()
+    with _sessions_lock:
+        _sessions.clear()
+        _sessions_last_access.clear()
+        _session_locks.clear()

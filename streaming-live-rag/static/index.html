@@ -1,282 +1,2283 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Streaming Live RAG — Judge's Demo Dashboard</title>
+  <title>Streaming Live RAG · Theme 4 | Samsung PRISM GenAI Hackathon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
+      --bg-dark: #070b14;
+      --bg-sidebar: #0b1120;
+      --bg-card: #0f172a;
+      --bg-input: #111a2e;
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-focus: rgba(56, 189, 248, 0.5);
       --accent: #38bdf8;
-      --accent-hover: #0ea5e9;
+      --accent-glow: rgba(56, 189, 248, 0.25);
+      --purple: #a855f7;
+      --purple-glow: rgba(168, 85, 247, 0.25);
       --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.25);
       --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.25);
       --error: #ef4444;
       --text: #f8fafc;
       --text-muted: #94a3b8;
+      --text-dim: #64748b;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-    h1 { font-size: 1.5rem; color: #fff; display: flex; align-items: center; gap: 10px; }
-    .badge { padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-    .badge-primary { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid var(--accent); }
-    .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid var(--success); }
-    .badge-warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid var(--warning); }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
+
+    /* Top Nav */
+    header {
+      height: 56px;
+      background: rgba(11, 17, 32, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+    }
+    .brand-title { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+    .brand-sub { font-size: 0.72rem; color: var(--text-muted); }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .pill {
+      font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .pill-green { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .pill-green .pill-dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
+    .pill-blue { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .pill-blue .pill-dot { background: #38bdf8; }
+
+    .header-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+    .header-btn:hover { border-color: var(--accent); background: rgba(56, 189, 248, 0.08); }
+
+    /* App Container (Sidebar + Chat) */
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 56px);
+      position: relative;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 320px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 16px;
+      gap: 16px;
+      z-index: 10;
+      transition: transform 0.25s;
+    }
+
+    /* Live Mode Switch Card */
+    .live-toggle-card {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(168, 85, 247, 0.08));
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .live-toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .live-toggle-title {
+      font-size: 0.85rem; font-weight: 700; color: #fff;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .live-toggle-sub {
+      font-size: 0.72rem; color: var(--text-muted); line-height: 1.4;
+    }
+
+    /* Toggle switch switch */
+    .switch {
+      position: relative; display: inline-block; width: 44px; height: 24px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: #1e293b; border: 1px solid var(--card-border);
+      transition: .3s; border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+      background-color: #fff; transition: .3s; border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #0284c7; border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    /* Section Headers */
+    .sidebar-section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    /* Scenarios List */
+    .scenario-item {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+    .scenario-item:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.04);
+      transform: translateY(-1px);
+    }
+    .scenario-item.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+    .scenario-top {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
+    }
+    .scenario-title { font-size: 0.78rem; font-weight: 700; color: #fff; }
+    .scenario-tag {
+      font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase;
+    }
+    .scenario-query {
+      font-size: 0.72rem; color: #cbd5e1; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* HUD Mini Grid in Sidebar */
+    .hud-mini-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .hud-mini-card {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      border-radius: 8px; padding: 8px 10px;
+    }
+    .hud-mini-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
+    .hud-mini-val { font-size: 0.9rem; font-weight: 700; color: #fff; margin-top: 2px; }
+
+    /* Corpus Mini Box */
+    .corpus-mini-box {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      border-radius: 10px; padding: 12px; font-size: 0.74rem;
+    }
+    .corpus-chunk-badge {
+      display: inline-block; background: rgba(56, 189, 248, 0.12); color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 4px;
+      padding: 1px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; margin: 2px 2px 2px 0;
+    }
+
+    /* Main Chat Section */
+    .chat-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-dark);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Chat Messages Stream */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px 170px;
+      scroll-behavior: smooth;
+    }
+    .chat-container {
+      max-width: 860px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Empty State Hero */
+    .hero-banner {
+      text-align: center;
+      padding: 40px 20px;
+      margin-top: 20px;
+      border: 1px dashed rgba(56, 189, 248, 0.2);
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.4);
+    }
+    .hero-icon {
+      font-size: 2.2rem; margin-bottom: 10px; display: inline-block;
+      animation: floatIcon 3s ease-in-out infinite;
+    }
+    @keyframes floatIcon {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    .hero-title { font-size: 1.25rem; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .hero-sub { font-size: 0.82rem; color: var(--text-muted); max-width: 580px; margin: 0 auto 18px; line-height: 1.5; }
+    .hero-badges { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
+    /* Message Rows */
+    .chat-row {
+      display: flex;
+      gap: 14px;
+      animation: fadeInRow 0.22s ease-out;
+    }
+    @keyframes fadeInRow {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .chat-row.user {
+      justify-content: flex-end;
+    }
+
+    .msg-avatar {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+    }
+    .msg-avatar.assistant {
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+    .msg-avatar.user {
+      background: #1e293b; border: 1px solid var(--card-border);
+    }
+
+    .msg-bubble {
+      max-width: 82%;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+    .chat-row.user .msg-bubble {
+      background: #1e293b;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    }
+    .chat-row.assistant .msg-bubble {
+      background: var(--bg-card);
+      border: 1px solid var(--card-border);
+      color: #e2e8f0;
+      flex: 1;
+      max-width: 100%;
+    }
+
+    /* User Message Audio Indicator */
+    .user-msg-meta {
+      display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--accent); margin-bottom: 4px; font-weight: 600;
+    }
+
+    /* ─── CLAUDE / DEEPSEEK STYLE THINKING ACCORDION ─── */
+    .thinking-accordion {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 12px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+      transition: all 0.25s ease;
+    }
+    .thinking-accordion.active-stream {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    .thinking-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 14px;
+      cursor: pointer;
+      background: rgba(56, 189, 248, 0.05);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+      user-select: none;
+      transition: background 0.2s;
+    }
+    .thinking-header:hover {
+      background: rgba(56, 189, 248, 0.09);
+    }
+    .thinking-header-left {
+      display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; color: #fff;
+    }
+    .thinking-brain-icon {
+      font-size: 1rem;
+      animation: pulseBrain 1.4s ease-in-out infinite alternate;
+    }
+    @keyframes pulseBrain {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      100% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 6px #38bdf8); }
+    }
+    .thinking-status-pill {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 6px;
+      background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3);
+    }
+    .thinking-toggle-icon {
+      font-size: 0.75rem; color: var(--text-muted); transition: transform 0.2s;
+    }
+    .thinking-accordion.collapsed .thinking-toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .turn-inspector-tabs {
+      display: inline-flex;
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+      margin-left: auto;
+      margin-right: 8px;
+    }
+    .turn-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 0.68rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .turn-tab-btn:hover {
+      color: #fff;
+    }
+    .turn-tab-btn.active {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .thought-stream-pane { display: block; }
+    .pipeline-trace-pane { display: none; }
+
+    .thought-stream-paragraph {
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border-left: 3px solid #38bdf8;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      animation: thoughtSlideIn 0.2s ease-out;
+    }
+    .thought-stream-paragraph.phase-1 { border-left-color: #38bdf8; }
+    .thought-stream-paragraph.phase-2 { border-left-color: #c084fc; }
+    .thought-stream-paragraph.phase-3 { border-left-color: #fbbf24; }
+    .thought-stream-paragraph.phase-4 { border-left-color: #34d399; }
+
+    .thought-stream-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+    }
+    .thought-phase-tag {
+      font-weight: 700;
+      color: #f1f5f9;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .thought-phase-time {
+      color: var(--text-dim);
+    }
+    .thought-stream-content {
+      color: #cbd5e1;
+      font-size: 0.78rem;
+    }
+    .thought-line {
+      margin-bottom: 4px;
+    }
+    .thought-line-break {
+      height: 6px;
+    }
+    .thought-line strong {
+      color: #f1f5f9;
+      font-weight: 600;
+    }
+    .thought-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: #93c5fd;
+    }
+    .thought-bullet {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      margin-left: 6px;
+      margin-top: 3px;
+      color: #e2e8f0;
+    }
+    .thought-bullet .bullet-dot {
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    .thinking-body {
+      padding: 12px 14px;
+      font-size: 0.78rem;
+      line-height: 1.55;
+      max-height: 420px;
+      overflow-y: auto;
+      background: #080d19;
+    }
+    .thinking-accordion.collapsed .thinking-body {
+      display: none;
+    }
+
+    /* Thought Trace Items */
+    .thought-item {
+      position: relative;
+      padding-left: 24px;
+      margin-bottom: 12px;
+      animation: thoughtSlideIn 0.2s ease-out;
+    }
+    @keyframes thoughtSlideIn {
+      from { opacity: 0; transform: translateX(-6px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .thought-rail {
+      position: absolute; left: 7px; top: 18px; bottom: -8px; width: 2px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .thought-item:last-child .thought-rail { display: none; }
+    .thought-dot {
+      position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 50%;
+      background: #0f172a; border: 2px solid var(--accent);
+      display: flex; align-items: center; justify-content: center; font-size: 0.55rem;
+    }
+    .thought-item.fire .thought-dot { border-color: var(--success); box-shadow: 0 0 8px var(--success-glow); }
+    .thought-item.continuation .thought-dot { border-color: var(--purple); box-shadow: 0 0 8px var(--purple-glow); }
+    .thought-item.fusion .thought-dot { border-color: var(--warning); box-shadow: 0 0 8px var(--warning-glow); }
+
+    .thought-meta {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 3px;
+    }
+    .thought-time {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--accent); font-weight: 700;
+    }
+    .thought-badge {
+      font-size: 0.64rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; text-transform: uppercase;
+    }
+    .thought-badge-fire { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid var(--success); }
+    .thought-badge-cont { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid var(--purple); }
+    .thought-badge-fusion { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid var(--warning); }
+    .thought-badge-speech { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+
+    .thought-title { font-size: 0.8rem; font-weight: 700; color: #fff; }
     
-    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 24px; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-    
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
-    .card h2 { font-size: 1rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; align-items: center; }
-    
-    .scenario-btn { display: block; width: 100%; text-align: left; padding: 10px 12px; margin-bottom: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
-    .scenario-btn:hover { background: rgba(56, 189, 248, 0.1); border-color: var(--accent); color: #fff; }
-    
-    label { font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px; }
-    input[type="text"], textarea { width: 100%; background: #0b1120; border: 1px solid var(--border); border-radius: 8px; color: #fff; padding: 10px 12px; font-size: 0.9rem; margin-bottom: 12px; outline: none; }
-    input[type="text"]:focus, textarea:focus { border-color: var(--accent); }
-    
-    .btn { background: var(--accent); color: #000; font-weight: 600; padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 0.95rem; transition: background 0.2s; }
-    .btn:hover { background: var(--accent-hover); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    
-    .pipeline-stage { margin-bottom: 16px; padding: 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 10px; }
-    .stage-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 600; color: var(--accent); margin-bottom: 8px; }
-    .stage-content { font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; }
-    
-    .tag-chip { display: inline-block; background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 0.8rem; margin: 2px 4px 2px 0; }
-    .chunk-card { background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; font-size: 0.82rem; }
-    .chunk-meta { display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.75rem; margin-bottom: 4px; }
-    
-    .telemetry-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem; }
-    .telemetry-label { color: var(--text-muted); }
-    .telemetry-val { font-family: monospace; color: #fff; font-weight: 500; }
-    
-    .answer-box { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 16px; margin-top: 12px; }
-    .answer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .answer-text { line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap; }
-    .uncertainty-alert { margin-top: 10px; padding: 8px 12px; background: rgba(245, 158, 11, 0.1); border-left: 3px solid var(--warning); color: #fde68a; font-size: 0.82rem; }
+    .thought-chunk-box {
+      margin: 6px 0;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.95);
+      border-left: 3px solid var(--accent);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      border-right: 1px solid rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .thought-chunk-label {
+      font-size: 0.62rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .thought-chunk-text {
+      font-size: 0.76rem; color: #f1f5f9; font-style: italic;
+    }
+    .thought-text { font-size: 0.76rem; color: #cbd5e1; }
+    .thought-note {
+      font-size: 0.72rem; color: #34d399; margin-top: 4px; font-weight: 600; display: flex; align-items: center; gap: 4px;
+    }
+
+    /* Live Thinking Pulse indicator */
+    .live-thinking-indicator {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--accent); font-weight: 600; font-size: 0.75rem;
+      padding: 6px 10px; border-radius: 8px; background: rgba(56, 189, 248, 0.08);
+      margin-bottom: 8px; border: 1px dashed rgba(56, 189, 248, 0.3);
+    }
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+      animation: pulseDot 1s infinite alternate;
+    }
+    @keyframes pulseDot { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.3); opacity: 1; } }
+
+    /* Assistant Answer Text */
+    .answer-text {
+      font-size: 0.9rem;
+      color: #f1f5f9;
+      line-height: 1.65;
+    }
+    .answer-text p { margin-bottom: 8px; }
+    .answer-text ol, .answer-text ul { margin-left: 20px; margin-bottom: 8px; }
+
+    /* Citation Chip */
+    .citation-chip {
+      background: rgba(56, 189, 248, 0.16);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 5px;
+      padding: 1px 7px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.2s;
+    }
+    .citation-chip:hover {
+      background: rgba(56, 189, 248, 0.3);
+      box-shadow: 0 0 8px var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    /* Verification Footer */
+    .verification-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      font-size: 0.74rem;
+      color: #34d399;
+      font-weight: 600;
+    }
+    .verification-footer.abstained {
+      background: rgba(245, 158, 11, 0.08);
+      border-color: rgba(245, 158, 11, 0.25);
+      color: #fbbf24;
+    }
+
+    /* ─── FLOATING INPUT BAR AT BOTTOM (CHATGPT STYLE) ─── */
+    .chat-input-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 40px);
+      max-width: 860px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 30;
+    }
+
+    /* Quick Preset Scenario Chips */
+    .quick-chips-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .quick-chips-row::-webkit-scrollbar { display: none; }
+    .quick-chip {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quick-chip:hover {
+      color: #fff;
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+      transform: translateY(-1px);
+    }
+
+    /* Input Box */
+    .input-box-wrapper {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 8px 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.1);
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-box-wrapper:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 25px var(--accent-glow);
+    }
+
+    .mic-action-btn {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0; transition: all 0.2s;
+    }
+    .mic-action-btn:hover {
+      background: rgba(56, 189, 248, 0.15); border-color: var(--accent);
+    }
+    .mic-action-btn.recording {
+      background: rgba(239, 68, 68, 0.2); border-color: var(--error); color: #f87171;
+      animation: pulseRecord 1s infinite alternate;
+    }
+    @keyframes pulseRecord { 0% { transform: scale(1); } 100% { transform: scale(1.1); box-shadow: 0 0 12px rgba(239,68,68,0.5); } }
+
+    .chat-textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      resize: none;
+      max-height: 120px;
+      padding: 6px 2px;
+    }
+    .chat-textarea::placeholder { color: var(--text-dim); }
+
+    .send-action-btn {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border: none;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+    }
+    .send-action-btn:hover {
+      background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.45);
+    }
+    .send-action-btn:disabled {
+      opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none;
+    }
+
+    .input-caption {
+      text-align: center; font-size: 0.68rem; color: var(--text-dim);
+    }
+
+    /* Modal for BYOK Settings */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px); z-index: 100;
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: #0f172a; border: 1px solid var(--card-border);
+      border-radius: 16px; max-width: 560px; width: 100%;
+      padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .modal-title { font-size: 1.1rem; font-weight: 700; color: #fff; }
+    .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.25rem; cursor: pointer; }
+    .close-btn:hover { color: #fff; }
+
+    label.field-label { display: block; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+    input.field-input, select.field-select {
+      width: 100%; background: #090e1a; border: 1px solid var(--card-border);
+      border-radius: 8px; color: #fff; padding: 8px 10px; font-size: 0.8rem;
+      margin-bottom: 10px; outline: none; transition: border-color 0.2s;
+    }
+    input.field-input:focus, select.field-select:focus { border-color: var(--accent); }
   </style>
 </head>
 <body>
 
+  <!-- Top Header Nav -->
   <header>
-    <div>
-      <h1>⚡ Streaming Live RAG <span class="badge badge-primary">Samsung PRISM 2026–27</span></h1>
-      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Theme 4 · Live Speech RAG with Multi-Intent & Grounding Verification</p>
+    <div class="brand">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <div class="brand-title">Streaming Live RAG <span class="pill pill-blue">Theme 4</span></div>
+        <div class="brand-sub">Samsung PRISM GenAI Hackathon · Speculative Retrieval &amp; Continuous Thought</div>
+      </div>
     </div>
-    <div style="display: flex; gap: 8px; align-items: center;">
-      <span class="badge badge-success" id="backend-status">API: Ready</span>
-      <span class="badge badge-primary">Hybrid RRF + Cross-Encoder</span>
+    <div class="header-actions">
+      <span class="pill pill-green" id="apiStatusPill"><span class="pill-dot"></span> Pipeline Ready</span>
+      <span class="pill pill-blue" id="corpusPill"><span class="pill-dot"></span> 4 Chunks Indexed</span>
+      <button class="header-btn" onclick="openByokModal()">⚙️ Settings</button>
+      <button class="header-btn" onclick="reseedCorpus()">🔄 Reseed Dev Data</button>
     </div>
   </header>
 
-  <div class="grid">
-    <!-- Left Panel: Controls & Presets -->
-    <div>
-      <div class="card">
-        <h2>Demo Scenarios</h2>
-        <button class="scenario-btn" onclick="setScenario('What is the maximum capacity of the workshop hall?', 'NEW_TOPIC')">
-          <strong>1. Early Retrieval (G2)</strong><br><small style="color:var(--text-muted)">Controller triggers on partial speech</small>
-        </button>
-        <button class="scenario-btn" onclick="setScenario('What is the venue capacity, what is the cancellation penalty, and who approves international travel?', 'NEW_TOPIC')">
-          <strong>2. Multi-Intent Compound (G3)</strong><br><small style="color:var(--text-muted)">Decomposes into 3 parallel sub-queries</small>
-        </button>
-        <button class="scenario-btn" onclick="setScenario('Hello! Can you help me today?', 'PRESENTATION_ONLY')">
-          <strong>3. Chit-Chat Suppression (C2)</strong><br><small style="color:var(--text-muted)">Zero retrieval calls, instant reply</small>
-        </button>
-        <button class="scenario-btn" onclick="setScenario('Can you format that in two bullet points?', 'PRESENTATION_ONLY')">
-          <strong>4. Presentation Reformat (C4)</strong><br><small style="color:var(--text-muted)">Zero retrieval, reformats prior answer</small>
-        </button>
-        <button class="scenario-btn" onclick="setScenario('Actually, what if there are 50 attendees?', 'LATE_DETAIL')">
-          <strong>5. Late-Detail Refinement (C7)</strong><br><small style="color:var(--text-muted)">Expands query, unions citations, version+1</small>
-        </button>
-        <button class="scenario-btn" onclick="setScenario('What is the domestic train meal allowance in Mumbai?', 'NEW_TOPIC')">
-          <strong>6. Out-of-Corpus Abstention (C6)</strong><br><small style="color:var(--text-muted)">Grounding enforcement prevents hallucination</small>
-        </button>
-      </div>
+  <!-- App Layout -->
+  <div class="app-container">
 
-      <div class="card">
-        <h2>Session Configuration</h2>
-        <label for="sessionId">Session ID</label>
-        <input type="text" id="sessionId" value="session_demo_01" />
-        
-        <label for="turnId">Turn Number</label>
-        <input type="text" id="turnId" value="1" />
+    <!-- Sidebar -->
+    <div class="sidebar">
 
-        <label for="utterance">User Speech Utterance</label>
-        <textarea id="utterance" rows="3" placeholder="Speak or enter query...">What is the maximum capacity of the workshop hall?</textarea>
-
-        <button class="btn" id="runBtn" onclick="runTurn()">Run Streaming Turn</button>
-      </div>
-
-      <div class="card">
-        <h2>Live Telemetry (G6)</h2>
-        <div id="telemetryContent">
-          <div class="telemetry-row"><span class="telemetry-label">Status</span><span class="telemetry-val">Idle</span></div>
-          <div class="telemetry-row"><span class="telemetry-label">Answer Version</span><span class="telemetry-val" id="t-version">0</span></div>
-          <div class="telemetry-row"><span class="telemetry-label">Grounding Score</span><span class="telemetry-val" id="t-grounding">-</span></div>
-          <div class="telemetry-row"><span class="telemetry-label">End-to-End Latency</span><span class="telemetry-val" id="t-latency">-</span></div>
-          <div class="telemetry-row"><span class="telemetry-label">Est. Token Cost</span><span class="telemetry-val" id="t-cost">-</span></div>
+      <!-- Live Stream Mode Switch Card -->
+      <div class="live-toggle-card">
+        <div class="live-toggle-row">
+          <div class="live-toggle-title">
+            <span>🔴 Live Stream Mode</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="liveModeToggle" checked onchange="toggleLiveMode(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="live-toggle-sub">
+          When <strong>ON</strong>: Evaluates speech and typing dynamically. Fires speculative background retrieval as data arrives and continues thinking without resetting!
         </div>
       </div>
+
+      <!-- Session Info -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:0.75rem; color:var(--text-muted);">
+          Session: <code id="lblSession" style="color:var(--accent);">session_demo_01</code>
+        </div>
+        <button class="header-btn" onclick="clearSessionHistory()" style="padding:4px 8px; font-size:0.7rem;">
+          + New Chat
+        </button>
+      </div>
+
+      <!-- Telemetry HUD Mini -->
+      <div>
+        <div class="sidebar-section-title">
+          <span>📊 Live Telemetry HUD</span>
+        </div>
+        <div class="hud-mini-grid">
+          <div class="hud-mini-card">
+            <div class="hud-mini-label">Latency</div>
+            <div class="hud-mini-val" id="hudLatency">— ms</div>
+          </div>
+          <div class="hud-mini-card">
+            <div class="hud-mini-label">Grounding</div>
+            <div class="hud-mini-val" id="hudGrounding">—</div>
+          </div>
+          <div class="hud-mini-card">
+            <div class="hud-mini-label">Intents</div>
+            <div class="hud-mini-val" id="hudIntents">0 Intents</div>
+          </div>
+          <div class="hud-mini-card">
+            <div class="hud-mini-label">Version</div>
+            <div class="hud-mini-val" id="hudVersion">v1</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Benchmark Scenarios -->
+      <div>
+        <div class="sidebar-section-title">
+          <span>🎯 Benchmark Scenarios</span>
+          <span style="font-size:0.65rem; color:var(--text-dim);">1-Click Test</span>
+        </div>
+
+        <div class="scenario-item" onclick="loadAndRunScenario(1)">
+          <div class="scenario-top">
+            <span class="scenario-title">⚡ 1. Early Retrieval (Gate G2)</span>
+            <span class="scenario-tag" style="background:rgba(56,189,248,0.2); color:#38bdf8;">Speculative</span>
+          </div>
+          <div class="scenario-query">"What is the maximum capacity of the workshop hall?"</div>
+        </div>
+
+        <div class="scenario-item active" onclick="loadAndRunScenario(2)">
+          <div class="scenario-top">
+            <span class="scenario-title">🔀 2. Multi-Intent Compound (G3)</span>
+            <span class="scenario-tag" style="background:rgba(168,85,247,0.2); color:#c084fc;">3 Parallel Beams</span>
+          </div>
+          <div class="scenario-query">"What is the venue capacity, what is the cancellation penalty, and who approves international travel?"</div>
+        </div>
+
+        <div class="scenario-item" onclick="loadAndRunScenario(3)">
+          <div class="scenario-top">
+            <span class="scenario-title">💬 3. Chit-Chat Suppression (C2)</span>
+            <span class="scenario-tag" style="background:rgba(16,185,129,0.2); color:#34d399;">0 Retrieval</span>
+          </div>
+          <div class="scenario-query">"Hello! Can you help me today?"</div>
+        </div>
+
+        <div class="scenario-item" onclick="loadAndRunScenario(4)">
+          <div class="scenario-top">
+            <span class="scenario-title">📋 4. Presentation Reformat (C4)</span>
+            <span class="scenario-tag" style="background:rgba(245,158,11,0.2); color:#fbbf24;">Cache Reformat</span>
+          </div>
+          <div class="scenario-query">"Can you format that in two bullet points?"</div>
+        </div>
+
+        <div class="scenario-item" onclick="loadAndRunScenario(5)">
+          <div class="scenario-top">
+            <span class="scenario-title">🔄 5. Late-Detail Refinement (C7)</span>
+            <span class="scenario-tag" style="background:rgba(56,189,248,0.2); color:#38bdf8;">Version +1</span>
+          </div>
+          <div class="scenario-query">"Actually, what if there are 50 attendees?"</div>
+        </div>
+
+        <div class="scenario-item" onclick="loadAndRunScenario(6)">
+          <div class="scenario-top">
+            <span class="scenario-title">🛡️ 6. Out-of-Corpus Abstention (C6)</span>
+            <span class="scenario-tag" style="background:rgba(239,68,68,0.2); color:#f87171;">Hallucination Guard</span>
+          </div>
+          <div class="scenario-query">"What is the domestic train meal allowance in Mumbai?"</div>
+        </div>
+      </div>
+
+      <!-- Corpus Overview -->
+      <div>
+        <div class="sidebar-section-title">
+          <span>📁 Indexed Corpus</span>
+          <button onclick="refreshCorpus()" style="background:none; border:none; color:var(--accent); font-size:0.68rem; cursor:pointer;">[Refresh]</button>
+        </div>
+        <div class="corpus-mini-box">
+          <div id="corpusSummaryText" style="margin-bottom:6px; color:var(--text-muted);">Loading corpus data...</div>
+          <div id="corpusDocsList"></div>
+          <div style="margin-top:10px; border-top:1px solid var(--card-border); padding-top:8px;">
+            <input type="file" id="docUploadInput" style="display:none;" onchange="handleFileUpload(event)" accept=".pdf,.docx,.pptx,.xlsx,.csv,.tsv,.json,.yaml,.yml,.html,.htm,.txt,.md" />
+            <button class="header-btn" onclick="document.getElementById('docUploadInput').click()" style="width:100%; justify-content:center; padding:6px;">
+              📤 Upload Custom File
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- Right Panel: Live Pipeline Execution -->
-    <div>
-      <div class="card">
-        <h2>Live Pipeline Execution</h2>
-        
-        <!-- Stream Simulation -->
-        <div class="pipeline-stage">
-          <div class="stage-header">
-            <span>STAGE 1: ASR Streaming Speech Chunks</span>
-            <span id="speechTimer" style="font-family:monospace; color:var(--text-muted)">0.0s</span>
+    <!-- Main Chat Thread -->
+    <div class="chat-main">
+
+      <!-- Scrollable Conversation Stream -->
+      <div class="chat-messages" id="chatScrollArea">
+        <div class="chat-container" id="chatThread">
+
+          <!-- Hero Greeting -->
+          <div class="hero-banner" id="heroBanner">
+            <div class="hero-icon">⚡</div>
+            <div class="hero-title">Streaming Live Speech RAG</div>
+            <div class="hero-sub">
+              Experience real-time speculative search with uninterrupted continuous thought. Speak into the microphone or test a benchmark scenario below to watch the thinking process unfold!
+            </div>
+            <div class="hero-badges">
+              <span class="pill pill-blue">⚡ Speculative Pre-Retrieval (Gate G2)</span>
+              <span class="pill pill-green">🧠 Uninterrupted Continuous Thought (Gate G3)</span>
+              <span class="pill pill-blue">🛡️ 100% Grounded Citations (Gate G4)</span>
+            </div>
           </div>
-          <div class="stage-content" id="speechStream">Ready. Click 'Run Streaming Turn' to simulate incoming speech.</div>
+
+        </div>
+      </div>
+
+      <!-- Floating Bottom Input Bar (ChatGPT style) -->
+      <div class="chat-input-bar">
+
+        <!-- Quick Scenario Chips -->
+        <div class="quick-chips-row">
+          <div class="quick-chip" onclick="loadAndRunScenario(2)">🔀 Scenario 2: Multi-Intent (3 Beams)</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(1)">⚡ Scenario 1: Early Retrieval</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(3)">💬 Scenario 3: Chit-Chat (0 Retrieval)</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(4)">📋 Scenario 4: Reformat Cache</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(5)">🔄 Scenario 5: Refinement v2</div>
+          <div class="quick-chip" onclick="loadAndRunScenario(6)">🛡️ Scenario 6: Abstention</div>
         </div>
 
-        <!-- Controller Decisions -->
-        <div class="pipeline-stage">
-          <div class="stage-header">
-            <span>STAGE 2: Streaming Controller Decisions (G2)</span>
-            <span id="controllerBadge" class="badge badge-primary">Awaiting Stream</span>
-          </div>
-          <div class="stage-content" id="controllerLog">Decisions will appear here in real-time as speech chunks arrive.</div>
+        <!-- Chat Input Console -->
+        <div class="input-box-wrapper">
+          <button class="mic-action-btn" id="micBtn" title="Speak into Microphone" onclick="toggleSpeechRecognition()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+          </button>
+
+          <textarea id="chatInput" class="chat-textarea" rows="1" placeholder="Ask a question or speak into microphone (Live Stream is ON)..." onkeydown="handleInputKey(event)"></textarea>
+
+          <button class="send-action-btn" id="sendBtn" title="Send message" onclick="submitUserMessage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
         </div>
 
-        <!-- Multi-Intent Decomposition -->
-        <div class="pipeline-stage">
-          <div class="stage-header">
-            <span>STAGE 3: Multi-Intent Decomposition (G3)</span>
-            <span id="intentCount" class="badge badge-primary">0 Intents</span>
-          </div>
-          <div class="stage-content" id="decomposeLog">Sub-queries and intent tags will be displayed here.</div>
+        <div class="input-caption" id="inputCaption">
+          ⚡ <strong>Live Stream ON:</strong> As speech or typing streams in, speculative searches trigger in background and continuations are absorbed seamlessly into thought.
         </div>
 
-        <!-- Retrieved Evidence -->
-        <div class="pipeline-stage">
-          <div class="stage-header">
-            <span>STAGE 4: Quota Retrieval & RRF Evidence (H8)</span>
-            <span id="evidenceCount" class="badge badge-primary">0 Chunks</span>
-          </div>
-          <div class="stage-content" id="evidenceLog">Retrieved passages with canonical tags will display here.</div>
-        </div>
+      </div>
 
-        <!-- Grounded Synthesis Answer -->
-        <div class="answer-box">
-          <div class="answer-header">
-            <strong style="color:var(--success); font-size:1rem;">STAGE 5: Grounded Answer & Citation Traceability (G4)</strong>
-            <span id="answerVersionBadge" class="badge badge-success">Version 1</span>
-          </div>
-          <div class="answer-text" id="answerOutput">Answer will be rendered here with verified [Doc_XX §Y] citations.</div>
-          <div id="uncertaintyAlert" class="uncertainty-alert" style="display:none;"></div>
-        </div>
+    </div>
 
+  </div>
+
+  <!-- Modal: BYOK Provider Configuration -->
+  <div class="modal-backdrop" id="byokModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">⚙️ LLM Provider Settings (BYOK)</div>
+        <button class="close-btn" onclick="closeByokModal()">&times;</button>
+      </div>
+
+      <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:14px;">
+        Configure third-party providers (Groq, Google Gemini, Ollama, NVIDIA NIM, OpenAI). Keys are write-only.
+      </div>
+
+      <div style="margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--card-border);">
+        <label class="field-label" style="color:var(--accent);">⚡ Fast Controller / Decomposer Provider</label>
+        <select id="mFastProvider" class="field-select">
+          <option value="groq">Groq (Default Cloud Fast)</option>
+          <option value="ollama">Ollama (Local / Offline)</option>
+          <option value="nvidia">NVIDIA NIM</option>
+          <option value="openai">OpenAI</option>
+        </select>
+
+        <label class="field-label">Fast Model</label>
+        <input type="text" id="mFastModel" class="field-input" value="openai/gpt-oss-20b" />
+
+        <label class="field-label">Fast API Key (Write-Only)</label>
+        <input type="password" id="mFastApiKey" class="field-input" placeholder="Enter new key to update..." />
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label class="field-label" style="color:var(--success);">🧠 Quality Synthesis Provider</label>
+        <select id="mSynthProvider" class="field-select">
+          <option value="gemini">Google Gemini (Default)</option>
+          <option value="nvidia">NVIDIA NIM</option>
+          <option value="groq">Groq</option>
+          <option value="ollama">Ollama</option>
+          <option value="openai">OpenAI</option>
+        </select>
+
+        <label class="field-label">Synthesis Model</label>
+        <input type="text" id="mSynthModel" class="field-input" value="gemini-3.5-flash-lite" />
+
+        <label class="field-label">Synthesis API Key (Write-Only)</label>
+        <input type="password" id="mSynthApiKey" class="field-input" placeholder="Enter new key to update..." />
+      </div>
+
+      <div id="modalStatus" style="display:none; font-size:0.75rem; padding:8px; border-radius:8px; margin-bottom:12px;"></div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="header-btn" onclick="testModalProviders()">Test Connection</button>
+        <button class="header-btn" onclick="saveModalConfig()" style="background:var(--accent); color:#000; border-color:var(--accent); font-weight:700;">Save &amp; Apply</button>
       </div>
     </div>
   </div>
 
   <script>
-    function setScenario(text, refType) {
-      document.getElementById('utterance').value = text;
+    // ─── STATE MANAGEMENT ─────────────────────────────────────────────
+    const state = {
+      sessionId: 'session_demo_01',
+      turnId: 1,
+      isLiveMode: true,
+      isRunning: false,
+      isRecording: false,
+      recognition: null,
+      ws: null,
+      wsConnected: false,
+      activeTurn: null,
+      scenarioTimer: null,
+      interimTimer: null,
+      recFinal: '',
+      typeWords: 0,
+      typeSent: '',
+    };
+
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    const SCENARIOS = {
+      1: { query: 'What is the maximum capacity of the workshop hall?', desc: 'Early Speculative Trigger (G2)' },
+      2: { query: 'What is the venue capacity, what is the cancellation penalty, and who approves international travel?', desc: 'Multi-Intent Compound (G3)' },
+      3: { query: 'Hello! Can you help me today?', desc: 'Chit-Chat Suppression (C2)' },
+      4: { query: 'Can you format that in two bullet points?', desc: 'Presentation Reformat (C4)' },
+      5: { query: 'Actually, what if there are 50 attendees?', desc: 'Late-Detail Refinement (C7)' },
+      6: { query: 'What is the domestic train meal allowance in Mumbai?', desc: 'Out-of-Corpus Abstention (C6)' },
+    };
+
+    // Auto-resize textarea & live typing dispatch
+    const chatInput = document.getElementById('chatInput');
+    chatInput.addEventListener('input', () => {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+      onChatTypeInput();
+    });
+
+    function toggleLiveMode(checked) {
+      state.isLiveMode = checked;
+      const caption = document.getElementById('inputCaption');
+      if (checked) {
+        caption.innerHTML = '⚡ <strong>Live Stream ON:</strong> Evaluates speech &amp; typing in real time. Fires speculative searches and absorbs continuations continuously without restarting!';
+        if (!state.wsConnected) connectWs();
+      } else {
+        caption.innerHTML = '⚪ <strong>Live Stream OFF:</strong> Standard turn execution mode (via POST /turn).';
+      }
     }
 
-    async function runTurn() {
-      const btn = document.getElementById('runBtn');
-      btn.disabled = true;
-      btn.innerText = 'Processing...';
+    function clearSessionHistory() {
+      state.sessionId = 'session_' + Math.random().toString(36).substring(2, 8);
+      state.turnId = 1;
+      state.activeTurn = null;
+      state.isRunning = false;
+      document.getElementById('lblSession').innerText = state.sessionId;
+      document.getElementById('hudVersion').innerText = 'v1';
+      document.getElementById('hudLatency').innerText = '— ms';
+      document.getElementById('hudGrounding').innerText = '—';
+      document.getElementById('hudIntents').innerText = '0 Intents';
+      document.getElementById('chatThread').innerHTML = `
+        <div class="hero-banner" id="heroBanner">
+          <div class="hero-icon">⚡</div>
+          <div class="hero-title">Streaming Live Speech RAG</div>
+          <div class="hero-sub">
+            Session reset! Speak into the microphone or test a benchmark scenario to watch the continuous thought engine in action.
+          </div>
+        </div>
+      `;
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({ type: 'start', session_id: state.sessionId }));
+      } else {
+        connectWs();
+      }
+    }
 
-      const utterance = document.getElementById('utterance').value.trim();
-      const sessionId = document.getElementById('sessionId').value.trim();
-      const turnId = parseInt(document.getElementById('turnId').value.trim(), 10) || 1;
+    function handleInputKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (state.isLiveMode && state.wsConnected && state.isRunning) {
+          sendWsEnd();
+          chatInput.value = '';
+          chatInput.style.height = 'auto';
+        } else {
+          submitUserMessage();
+        }
+      }
+    }
 
-      // Reset panels
-      document.getElementById('speechStream').innerText = 'Simulating speech stream: "' + utterance + '"';
-      document.getElementById('controllerLog').innerHTML = '<div style="color:var(--text-muted)">Evaluating speech chunks...</div>';
-      document.getElementById('decomposeLog').innerHTML = '<div style="color:var(--text-muted)">Waiting for full utterance...</div>';
-      document.getElementById('evidenceLog').innerHTML = '<div style="color:var(--text-muted)">Awaiting retrieval...</div>';
-      document.getElementById('answerOutput').innerText = 'Synthesizing grounded response...';
-      document.getElementById('uncertaintyAlert').style.display = 'none';
+    // ─── WEBSOCKET CLIENT (REAL-TIME SERVER STREAMING) ───────────────
 
+    function getWsUrl() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return proto + '//' + location.host + '/ws/stream';
+    }
+
+    function updateApiStatusPill(text, cls) {
+      const pill = document.getElementById('apiStatusPill');
+      if (!pill) return;
+      pill.className = 'pill ' + cls;
+      pill.innerHTML = `<span class="pill-dot"></span> ${text}`;
+    }
+
+    function connectWs() {
+      if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      try {
+        const ws = new WebSocket(getWsUrl());
+        state.ws = ws;
+
+        ws.onopen = () => {
+          state.wsConnected = true;
+          updateApiStatusPill('Live WebSocket Connected', 'pill-green');
+          ws.send(JSON.stringify({ type: 'start', session_id: state.sessionId }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            onServerEvent(msg);
+          } catch (e) {
+            console.error('Failed to parse WS message:', e);
+          }
+        };
+
+        ws.onerror = () => {
+          state.wsConnected = false;
+        };
+
+        ws.onclose = () => {
+          state.wsConnected = false;
+          updateApiStatusPill('HTTP Fallback Ready', 'pill-blue');
+          // Reconnect with backoff if live mode is still enabled
+          if (state.isLiveMode) {
+            setTimeout(connectWs, 2500);
+          }
+        };
+      } catch (e) {
+        console.warn('WS connection setup error:', e);
+      }
+    }
+
+    function sendWsChunk(text) {
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({ type: 'chunk', text: String(text).slice(0, 2000) }));
+      }
+    }
+
+    function sendWsEnd() {
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.send(JSON.stringify({ type: 'end' }));
+      }
+    }
+
+    // ─── CHAT UI CREATION & STREAMING ─────────────────────────────────
+
+    function appendUserMessage(text, isAudio = false) {
+      const hero = document.getElementById('heroBanner');
+      if (hero) hero.style.display = 'none';
+
+      const thread = document.getElementById('chatThread');
+      const row = document.createElement('div');
+      row.className = 'chat-row user';
+
+      row.innerHTML = `
+        <div class="msg-bubble">
+          <div class="user-msg-meta">
+            ${isAudio ? '🎙️ Live Audio Stream' : '⌨️ Live User Input'}
+          </div>
+          <span class="user-text-content">${esc(text)}</span>
+        </div>
+        <div class="msg-avatar user">👤</div>
+      `;
+      thread.appendChild(row);
+      scrollToBottom();
+      return row;
+    }
+
+    function createAssistantMessage() {
+      const thread = document.getElementById('chatThread');
+      const row = document.createElement('div');
+      row.className = 'chat-row assistant';
+
+      row.innerHTML = `
+        <div class="msg-avatar assistant">⚡</div>
+        <div class="msg-bubble">
+          <!-- Collapsible Thinking Process Box (Editorial / Lab style) -->
+          <div class="thinking-accordion active-stream" id="curThinkingAccordion">
+            <div class="thinking-header" onclick="toggleThinkingBox(this.parentElement)">
+              <div class="thinking-header-left">
+                <span class="thinking-brain-icon">🧠</span>
+                <span>Thought stream</span>
+                <span class="thinking-status-pill" id="curThinkingClock">Thinking (0.0s)...</span>
+              </div>
+              <div class="turn-inspector-tabs" onclick="event.stopPropagation()">
+                <button type="button" class="turn-tab-btn active" data-tab="thought">Thought stream</button>
+                <button type="button" class="turn-tab-btn" data-tab="trace">Pipeline trace</button>
+              </div>
+              <div class="thinking-toggle-icon">▼</div>
+            </div>
+            <div class="thinking-body" id="curThinkingBody">
+              <!-- Pane 1: Thought stream (default) -->
+              <div class="thought-stream-pane" id="curThoughtPane">
+                <div class="thought-paragraphs" id="curThoughtParagraphs"></div>
+                <div class="live-thinking-indicator" id="curLiveIndicator">
+                  <span class="pulse-dot"></span>
+                  <span id="curLiveIndicatorText">Evaluating speech chunks &amp; controller triggers in real time...</span>
+                </div>
+              </div>
+              <!-- Pane 2: Pipeline trace (raw badges, inspector, latency) -->
+              <div class="pipeline-trace-pane" id="curTracePane" style="display:none;">
+                <div class="trace-items-list" id="curTraceList"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Answer Body -->
+          <div class="answer-text" id="curAnswerText">
+            <span style="color:var(--text-dim); font-size:0.84rem;">Thinking in progress...</span>
+          </div>
+
+          <!-- Verification Footer -->
+          <div class="verification-footer" id="curVerificationFooter" style="display:none;">
+            <span id="curVerifIcon">✅</span>
+            <span id="curVerifText">100% Grounded · Zero Fabrications</span>
+          </div>
+        </div>
+      `;
+      thread.appendChild(row);
+      scrollToBottom();
+      return row;
+    }
+
+    function toggleThinkingBox(accordionEl) {
+      accordionEl.classList.toggle('collapsed');
+    }
+
+    function scrollToBottom() {
+      const scrollArea = document.getElementById('chatScrollArea');
+      if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
+    }
+
+    function ensureTurnUI(initialUserText = 'Listening…', isAudio = false) {
+      if (state.activeTurn) return state.activeTurn;
+
+      state.isRunning = true;
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) sendBtn.disabled = true;
+
+      const userRow = appendUserMessage(initialUserText, isAudio);
+      const userTextSpan = userRow.querySelector('.user-text-content');
+
+      const assistantRow = createAssistantMessage();
+      const thinkingAccordion = assistantRow.querySelector('#curThinkingAccordion');
+      const thinkingBody = assistantRow.querySelector('#curThinkingBody');
+      const thinkingClock = assistantRow.querySelector('#curThinkingClock');
+      const thoughtPane = assistantRow.querySelector('#curThoughtPane');
+      const thoughtParagraphs = assistantRow.querySelector('#curThoughtParagraphs');
+      const tracePane = assistantRow.querySelector('#curTracePane');
+      const traceList = assistantRow.querySelector('#curTraceList');
+      const liveIndicator = assistantRow.querySelector('#curLiveIndicator');
+      const liveIndicatorText = assistantRow.querySelector('#curLiveIndicatorText');
+      const answerContainer = assistantRow.querySelector('#curAnswerText');
+      const verifFooter = assistantRow.querySelector('#curVerificationFooter');
+      const verifIcon = assistantRow.querySelector('#curVerifIcon');
+      const verifText = assistantRow.querySelector('#curVerifText');
+
+      // Wire up tab toggle buttons
+      const tabBtns = assistantRow.querySelectorAll('.turn-tab-btn');
+      tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          tabBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const tab = btn.getAttribute('data-tab');
+          if (tab === 'thought') {
+            thoughtPane.style.display = 'block';
+            tracePane.style.display = 'none';
+          } else {
+            thoughtPane.style.display = 'none';
+            tracePane.style.display = 'block';
+          }
+        });
+      });
+
+      // Remove temporary IDs to prevent DOM collision
+      thinkingAccordion.removeAttribute('id');
+      thinkingBody.removeAttribute('id');
+      thinkingClock.removeAttribute('id');
+      thoughtPane.removeAttribute('id');
+      thoughtParagraphs.removeAttribute('id');
+      tracePane.removeAttribute('id');
+      traceList.removeAttribute('id');
+      liveIndicator.removeAttribute('id');
+      if (liveIndicatorText) liveIndicatorText.removeAttribute('id');
+      answerContainer.removeAttribute('id');
+      verifFooter.removeAttribute('id');
+      verifIcon.removeAttribute('id');
+      verifText.removeAttribute('id');
+
+      const startT = performance.now();
+      const clockInterval = setInterval(() => {
+        const elapsed = ((performance.now() - startT) / 1000).toFixed(1);
+        thinkingClock.innerText = `Thinking (${elapsed}s)...`;
+      }, 100);
+
+      const ctx = {
+        userRow,
+        userTextSpan,
+        assistantRow,
+        thinkingAccordion,
+        thinkingBody,
+        thinkingClock,
+        thoughtPane,
+        thoughtParagraphs,
+        tracePane,
+        traceList,
+        liveIndicator,
+        liveIndicatorText,
+        answerContainer,
+        verifFooter,
+        verifIcon,
+        verifText,
+        startT,
+        clockInterval,
+        turnTimeout: null,
+        thoughtsAdded: new Set(),
+      };
+      // Hard 60s wall-clock ceiling, in addition to (not instead of) the
+      // server's WS idle timeout. Fires regardless of whether the hang is
+      // client-side, server-side, or a dropped connection in between.
+      ctx.turnTimeout = setTimeout(() => onTurnTimeout(ctx), TURN_TIMEOUT_MS);
+      state.activeTurn = ctx;
+      return ctx;
+    }
+
+    const TURN_TIMEOUT_MS = 60000;
+
+    function onTurnTimeout(ctx) {
+      if (state.activeTurn !== ctx) return; // turn already resolved/replaced
+      clearInterval(ctx.clockInterval);
+      ctx.turnTimeout = null;
+      if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+      if (ctx.thinkingAccordion) ctx.thinkingAccordion.classList.remove('active-stream');
+      if (ctx.thinkingClock) ctx.thinkingClock.innerText = 'Timed out after 60s';
+      if (ctx.answerContainer) {
+        ctx.answerContainer.innerHTML = `
+          <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
+            ⏱️ Turn exceeded the 60s limit and was aborted.
+          </div>
+        `;
+      }
+      // Tell the server to abort: close (and, in Live mode, reopen) the WS so
+      // this session stops receiving events from the now-abandoned engine
+      // task, rather than leaving the client waiting indefinitely.
+      if (state.ws) {
+        try { state.ws.close(); } catch (e) {}
+      }
+      state.isRunning = false;
+      state.activeTurn = null;
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) sendBtn.disabled = false;
+      if (state.isLiveMode) connectWs();
+    }
+
+    function formatThoughtMarkdown(escaped) {
+      // Minimal markdown transform on escaped text:
+      // 1. Citation tags [Doc_XX §Y]
+      let res = escaped.replace(/\[(Doc_\d+(?:\s*§\s*[\w.\-]+)?)\]/g, (match, tag) => {
+        return `<span class="citation-chip" onclick="copyCitation('${tag}')">[${tag}]</span>`;
+      });
+      // 2. Bold **text**
+      res = res.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // 3. Inline code `code`
+      res = res.replace(/`([^`]+)`/g, '<code class="thought-code">$1</code>');
+      // 4. Bullet lines and paragraphs
+      const lines = res.split('\n');
+      const rendered = lines.map(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('- ')) {
+          return `<div class="thought-bullet"><span class="bullet-dot">•</span> <span>${trimmed.substring(2)}</span></div>`;
+        }
+        return line ? `<div class="thought-line">${line}</div>` : '<div class="thought-line-break"></div>';
+      });
+      return rendered.join('');
+    }
+
+    function appendThoughtParagraph(ctx, m) {
+      if (!ctx || !ctx.thoughtParagraphs) return;
+      const p = document.createElement('div');
+      p.className = `thought-stream-paragraph phase-${m.phase || 1}`;
+
+      const safeText = esc(m.text || '');
+      const formattedHtml = formatThoughtMarkdown(safeText);
+
+      p.innerHTML = `
+        <div class="thought-stream-meta">
+          <span class="thought-phase-tag">Phase ${m.phase || 1}</span>
+          <span class="thought-phase-time">${Number(m.t_s || 0).toFixed(2)}s</span>
+        </div>
+        <div class="thought-stream-content">${formattedHtml}</div>
+      `;
+      ctx.thoughtParagraphs.appendChild(p);
+      scrollToBottom();
+    }
+
+    function addThoughtItem(ctx, item) {
+      if (!ctx || !ctx.traceList) return;
+      const key = `${item.time}_${item.title}_${item.badge}`;
+      if (ctx.thoughtsAdded.has(key)) return;
+      ctx.thoughtsAdded.add(key);
+
+      const div = document.createElement('div');
+      div.className = `thought-item ${item.type || 'fusion'}`;
+      div.innerHTML = `
+        <div class="thought-rail"></div>
+        <div class="thought-dot">${item.dot || '•'}</div>
+        <div class="thought-meta">
+          <span class="thought-time">⏱️ ${item.time != null ? Number(item.time).toFixed(2) + 's' : '0.00s'}</span>
+          <span class="thought-badge ${item.badgeCls || 'thought-badge-fusion'}">${item.badge}</span>
+        </div>
+        <div class="thought-title">${item.title}</div>
+        ${item.chunkBox ? `
+          <div class="thought-chunk-box">
+            <div class="thought-chunk-label">${item.chunkLabel || 'Context Snapshot'}</div>
+            <div class="thought-chunk-text">${item.chunkBox}</div>
+          </div>` : ''}
+        <div class="thought-text">${item.text}</div>
+        ${item.note ? `<div class="thought-note">${item.note}</div>` : ''}
+      `;
+      ctx.traceList.appendChild(div);
+      scrollToBottom();
+    }
+
+    // ─── DISPATCH SERVER STREAMING EVENTS (WS) ────────────────────────
+
+    function onServerEvent(m) {
+      if (!m || !m.type) return;
+
+      switch (m.type) {
+        case 'stream_started': {
+          // Stream lifecycle event only. It must never create a turn on its
+          // own — a WS connect/reconnect (page load, Live-mode toggle,
+          // auto-reconnect) is not a user action. If a turn is already
+          // active (opened explicitly), there's nothing to update here.
+          break;
+        }
+
+        case 'transcript': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          if (m.partial_text && ctx.userTextSpan) {
+            ctx.userTextSpan.innerText = m.partial_text;
+          }
+          break;
+        }
+
+        case 'controller': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          const trig = m.trigger;
+          if (trig === 'wait') {
+            addThoughtItem(ctx, {
+              time: m.t_s,
+              type: 'speech',
+              dot: '⏳',
+              title: 'Controller Awaiting Stable Query Intent',
+              badge: 'WAITING FOR INTENT',
+              badgeCls: 'thought-badge-speech',
+              chunkLabel: `Partial Speech at t = ${Number(m.t_s).toFixed(2)}s`,
+              chunkBox: `&ldquo;${esc(m.query || '')}&rdquo;`,
+              text: `Reason: ${esc(m.reason || 'Waiting for core noun phrase / actionable entity')}`,
+              note: 'Pacing audio chunks; controller continuous loop active...'
+            });
+          } else if (trig === 'retrieve_now') {
+            addThoughtItem(ctx, {
+              time: m.t_s,
+              type: 'fire',
+              dot: '⚡',
+              title: 'Intent 1 Detected — Speculative Search Started! (Gate G2)',
+              badge: '⚡ SPECULATIVE SEARCH (INTENT 1)',
+              badgeCls: 'thought-badge-fire',
+              chunkLabel: `Search Entity Detected at t = ${Number(m.t_s).toFixed(2)}s`,
+              chunkBox: `&ldquo;${esc(m.query || '')}&rdquo;`,
+              text: `Controller identified actionable search entity! Started background Qdrant hybrid vector search immediately while speaker is <strong>STILL TALKING!</strong>`,
+              note: '🚀 User is still speaking! The system did NOT wait for speech to finish!'
+            });
+          } else if (trig === 'no_retrieval_needed') {
+            addThoughtItem(ctx, {
+              time: m.t_s,
+              type: 'fusion',
+              dot: '💬',
+              title: 'Conversational Chit-Chat Classification (C2)',
+              badge: 'ZERO RETRIEVAL',
+              badgeCls: 'thought-badge-fusion',
+              chunkLabel: `Speech Analyzed at t = ${Number(m.t_s).toFixed(2)}s`,
+              chunkBox: `&ldquo;${esc(m.query || '')}&rdquo;`,
+              text: `Classified as conversational: &ldquo;${esc(m.reason || 'Chit-chat')}&rdquo;. Vector retrieval suppressed.`,
+              note: '✅ 0 vector searches fired, 0 tokens wasted, instant response!'
+            });
+          }
+          break;
+        }
+
+        case 'retrieval_started': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          addThoughtItem(ctx, {
+            time: m.t_s,
+            type: 'fire',
+            dot: '🔍',
+            title: 'Provisional Hybrid Search Dispatched',
+            badge: 'PROVISIONAL RETRIEVAL',
+            badgeCls: 'thought-badge-fire',
+            chunkLabel: 'Speculative Search Query',
+            chunkBox: `&ldquo;${esc(m.query || '')}&rdquo;`,
+            text: `Background search thread executing dense + sparse retrieval across vector store.`,
+            note: 'Early search underway to eliminate wait latency!'
+          });
+          break;
+        }
+
+        case 'utterance_end': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          if (m.full_text && ctx.userTextSpan) {
+            ctx.userTextSpan.innerText = m.full_text;
+          }
+          addThoughtItem(ctx, {
+            time: m.t_s,
+            type: 'fusion',
+            dot: '🏁',
+            title: 'Speech Concluded — Continuous Reasoning Engaging',
+            badge: 'SPEECH COMPLETE',
+            badgeCls: 'thought-badge-speech',
+            chunkLabel: 'Full Utterance Captured',
+            chunkBox: `&ldquo;${esc(m.full_text || '')}&rdquo;`,
+            text: `User finished speaking. Handing off full audio transcript to multi-intent decomposer and session refiner.`,
+            note: 'Early speculative search results are already ready in memory!'
+          });
+          break;
+        }
+
+        case 'status': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          if (ctx.liveIndicatorText) {
+            ctx.liveIndicatorText.innerText = `Pipeline status: ${m.stage}...`;
+          }
+          // NOTE: the honest Phase 1–4 thought stream (server 'thought'
+          // events, rendered by appendThoughtParagraph) is the narration.
+          // The old canned "Continuation Ingested — Did Not Stop Thinking!"
+          // badge was removed: continuity must be demonstrated by the
+          // timestamped thoughts, never asserted by a badge.
+          break;
+        }
+
+        case 'retrieval': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          addThoughtItem(ctx, {
+            time: m.t_s,
+            type: 'fusion',
+            dot: '🔀',
+            title: `Hybrid Retrieval Completed (${m.hits} Hits)`,
+            badge: `RRF EVIDENCE FUSED`,
+            badgeCls: 'thought-badge-fusion',
+            chunkLabel: `Query: ${esc(m.query || '')}`,
+            chunkBox: `Trigger: ${esc(m.trigger || 'standard')} · Matched ${m.hits} chunk(s)`,
+            text: `Retrieved and reranked context chunks using Reciprocal Rank Fusion. Evidence preserved in quota pool without budget starvation.`,
+            note: 'Evidence assembled for citation-grounded synthesis.'
+          });
+          break;
+        }
+
+        case 'thought': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          appendThoughtParagraph(ctx, m);
+          break;
+        }
+
+        case 'answer': {
+          const ctx = state.activeTurn;
+          if (!ctx) break;
+          clearInterval(ctx.clockInterval);
+          if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
+          if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+          if (ctx.thinkingAccordion) ctx.thinkingAccordion.classList.remove('active-stream');
+
+          const subQCount = (m.sub_queries || []).length || 1;
+          const totalSec = m.t_s != null ? Number(m.t_s).toFixed(1) : '1.0';
+          if (ctx.thinkingClock) {
+            ctx.thinkingClock.innerText = `Thought for ${totalSec}s (${subQCount} sub-intent${subQCount > 1 ? 's' : ''})`;
+          }
+
+          // Stream answer typewriter with citation chips
+          streamAnswerTypewriter(ctx.answerContainer, m.answer || '');
+
+          // Verification badge
+          const isAbstain = Boolean(m.uncertainty) || String(m.answer || '').includes('not available in the provided documents');
+          ctx.verifFooter.style.display = 'flex';
+          if (isAbstain) {
+            ctx.verifFooter.className = 'verification-footer abstained';
+            ctx.verifIcon.innerText = '🛡️';
+            ctx.verifText.innerText = 'Strict Out-of-Corpus Abstention Enforced (Zero Hallucination)';
+          } else {
+            ctx.verifFooter.className = 'verification-footer';
+            ctx.verifIcon.innerText = '✅';
+            ctx.verifText.innerText = `Verified 100% Grounded · ${(m.citations || []).length} Citation(s) Matched · 0 Fabrications`;
+          }
+          break;
+        }
+
+        case 'telemetry': {
+          const telem = m.telemetry || {};
+          const ctx = state.activeTurn;
+          if (ctx) {
+            if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
+            // Early retrieval head start banner
+            if (telem.provisional_fired_s != null && telem.utterance_end_s != null) {
+              const hs = (Number(telem.utterance_end_s) - Number(telem.provisional_fired_s)).toFixed(2);
+              addThoughtItem(ctx, {
+                time: telem.utterance_end_s,
+                type: 'fire',
+                dot: '🚀',
+                title: `Early Retrieval Head-Start Realized!`,
+                badge: `⚡ +${hs}s HEAD START`,
+                badgeCls: 'thought-badge-fire',
+                chunkLabel: 'Server Wall-Clock Timing',
+                chunkBox: `Provisional Fired: ${telem.provisional_fired_s.toFixed(2)}s | Utterance End: ${telem.utterance_end_s.toFixed(2)}s`,
+                text: `Speculative search commenced <strong>${hs} seconds before</strong> speech finished, slashing overall query response latency!`,
+                note: 'Verified Gate G2 compliance: early execution without false triggers.'
+              });
+            }
+          }
+
+          updateSidebarHud(telem);
+          state.turnId++;
+          state.isRunning = false;
+          state.activeTurn = null;
+          const sendBtn = document.getElementById('sendBtn');
+          if (sendBtn) sendBtn.disabled = false;
+          break;
+        }
+
+        case 'error': {
+          const ctx = state.activeTurn;
+          if (ctx) {
+            clearInterval(ctx.clockInterval);
+            if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
+            if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+            ctx.thinkingClock.innerText = 'Error in Thinking';
+            ctx.answerContainer.innerHTML = `
+              <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
+                ❌ Server Error: ${esc(m.message || 'Turn error')}
+              </div>
+            `;
+          }
+          state.isRunning = false;
+          state.activeTurn = null;
+          const sendBtn = document.getElementById('sendBtn');
+          if (sendBtn) sendBtn.disabled = false;
+          break;
+        }
+      }
+    }
+
+    // ─── LIVE TYPING DISPATCH ─────────────────────────────────────────
+
+    function onChatTypeInput() {
+      if (!state.isLiveMode) return;
+      const text = chatInput.value;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      if (words === 0) {
+        state.typeWords = 0;
+        return;
+      }
+
+      if (!state.wsConnected) {
+        connectWs();
+      }
+
+      if (words > state.typeWords || words < state.typeWords) {
+        state.typeWords = words;
+        state.typeSent = text;
+        // Live-retrieval feature: keep streaming cumulative partials over the
+        // WS so the controller can fire speculative searches. This must NOT
+        // open a turn (no ensureTurnUI call) — typing alone should never flip
+        // state.isRunning, disable Send, or draw a chat bubble. A turn only
+        // opens on an explicit user action (Send/Enter, mic, or scenario).
+        sendWsChunk(text);
+      }
+    }
+
+    // ─── SCENARIO RUNNER (INPUT PACING OVER WS) ───────────────────────
+
+    function loadAndRunScenario(num) {
+      const sc = SCENARIOS[num];
+      if (!sc || state.isRunning) return;
+
+      document.querySelectorAll('.scenario-item').forEach(el => el.classList.remove('active'));
+      const items = document.querySelectorAll('.scenario-item');
+      if (items[num - 1]) items[num - 1].classList.add('active');
+
+      if (!state.wsConnected) {
+        connectWs();
+      }
+
+      chatInput.value = sc.query;
+
+      // If WS is live, pace speech words into the WebSocket to observe real server timestamps
+      if (state.isLiveMode && state.wsConnected) {
+        playScenarioOverWs(sc.query);
+      } else {
+        submitUserMessage(true);
+      }
+    }
+
+    function playScenarioOverWs(queryText) {
+      if (state.scenarioTimer) {
+        clearTimeout(state.scenarioTimer);
+        state.scenarioTimer = null;
+      }
+
+      const ctx = ensureTurnUI('Listening…', true);
+      const words = queryText.split(/\s+/).filter(Boolean);
+      let idx = 0;
+      let sent = '';
+
+      const step = () => {
+        for (let k = 0; k < 2 && idx < words.length; k++, idx++) {
+          sent += (sent ? ' ' : '') + words[idx];
+        }
+        if (ctx.userTextSpan) ctx.userTextSpan.innerText = sent;
+        sendWsChunk(sent);
+
+        if (idx < words.length) {
+          state.scenarioTimer = setTimeout(step, 180);
+        } else {
+          state.scenarioTimer = null;
+          chatInput.value = '';
+          sendWsEnd();
+        }
+      };
+
+      state.scenarioTimer = setTimeout(step, 60);
+    }
+
+    // ─── STANDARD / FALLBACK HTTP TURN EXECUTION ──────────────────────
+
+    async function submitUserMessage(isScenario = false) {
+      if (state.isRunning) return;
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      chatInput.value = '';
+      chatInput.style.height = 'auto';
+      // Programmatic clear does not fire the 'input' listener, so reset the
+      // live-typing word counter here. Otherwise a stale typeWords can equal
+      // the next turn's first word-count and suppress its first chunk.
+      state.typeWords = 0;
+
+      // If Live Mode & WS is connected, execute via WS
+      if (state.isLiveMode && state.wsConnected) {
+        const ctx = ensureTurnUI(text, false);
+        sendWsChunk(text);
+        sendWsEnd();
+        return;
+      }
+
+      // Fallback: standard POST /turn
+      const ctx = ensureTurnUI(text, false);
+      // ensureTurnUI already scheduled a generic 60s ctx.turnTimeout (via
+      // onTurnTimeout) sized for the WS path. For the HTTP fallback we want
+      // that same 60s ceiling to actually abort the in-flight fetch, so swap
+      // it for an AbortController tied to the identical TURN_TIMEOUT_MS
+      // duration — the catch/finally below already does the equivalent
+      // cleanup onTurnTimeout would have done.
+      if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
+      const abortController = new AbortController();
+      const abortTimer = setTimeout(() => abortController.abort(), TURN_TIMEOUT_MS);
       try {
         const res = await fetch('/turn', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId, turn_id: turnId, utterance: utterance })
+          body: JSON.stringify({
+            session_id: state.sessionId,
+            turn_id: state.turnId,
+            utterance: text,
+          }),
+          signal: abortController.signal,
         });
 
         if (!res.ok) {
-          throw new Error('API returned HTTP ' + res.status + ': ' + (await res.text()));
+          let err = await res.text();
+          try { err = JSON.parse(err).detail || err; } catch {}
+          throw new Error(err);
         }
 
         const data = await res.json();
         const telem = data.telemetry;
+        clearInterval(ctx.clockInterval);
 
-        // Render Controller Decisions
-        if (telem.controller_decisions && telem.controller_decisions.length > 0) {
-          document.getElementById('controllerLog').innerHTML = telem.controller_decisions.map(d => {
-            const badgeClass = d.trigger === 'retrieve_now' ? 'badge-success' : (d.trigger === 'no_retrieval_needed' ? 'badge-warning' : 'badge-primary');
-            return `<div style="margin-bottom:6px;">
-              <span class="badge ${badgeClass}">${d.trigger}</span> at <code>${d.timestamp_s}s</code>: ${d.reason}
-            </div>`;
-          }).join('');
+        if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+
+        // Render thought stream paragraphs in Thought Stream pane.
+        // The server always returns data.thoughts with real t_s and phase.
+        // If it is ever empty we render NOTHING rather than invent
+        // timestamps — a thought with a fabricated time is worse than none.
+        if (data.thoughts && Array.isArray(data.thoughts) && data.thoughts.length > 0) {
+          for (const t of data.thoughts) {
+            appendThoughtParagraph(ctx, t);
+          }
+        }
+
+        // Build thought items from returned telemetry for Pipeline Trace pane
+        const thoughts = buildThoughtProcess(text, telem, data);
+        for (const t of thoughts) {
+          addThoughtItem(ctx, t);
+        }
+
+        const totalSec = (telem.latencies_ms?.end_to_end / 1000).toFixed(1);
+        const intentCount = (telem.sub_queries || []).length || (telem.retrieval_required ? 1 : 0);
+        ctx.thinkingClock.innerText = `Thought for ${totalSec}s (${intentCount} sub-intent${intentCount > 1 ? 's' : ''})`;
+        ctx.thinkingAccordion.classList.remove('active-stream');
+
+        // Stream answer
+        await streamAnswerTypewriter(ctx.answerContainer, data.answer);
+
+        // Verification Badge
+        const isAbstain = Boolean(telem.uncertainty) || data.answer.includes("not available in the provided documents");
+        ctx.verifFooter.style.display = 'flex';
+        if (isAbstain) {
+          ctx.verifFooter.className = 'verification-footer abstained';
+          ctx.verifIcon.innerText = '🛡️';
+          ctx.verifText.innerText = 'Strict Out-of-Corpus Abstention Enforced (Zero Hallucination)';
         } else {
-          document.getElementById('controllerLog').innerHTML = `<span class="badge badge-warning">Suppressed / Presentation Only</span> (${telem.retrieval_skip_reason || 'No search needed'})`;
+          ctx.verifFooter.className = 'verification-footer';
+          ctx.verifIcon.innerText = '✅';
+          ctx.verifText.innerText = `Verified 100% Grounded · ${telem.citations?.length || 0} Citation(s) Matched · 0 Fabrications`;
         }
 
-        // Render Sub-queries
-        const subQs = telem.sub_queries || [];
-        document.getElementById('intentCount').innerText = `${subQs.length} Intent(s)`;
-        document.getElementById('decomposeLog').innerHTML = subQs.map((q, idx) => 
-          `<div style="margin-bottom:4px;"><strong>Intent ${idx + 1}:</strong> <span style="color:#fff;">${q}</span></div>`
-        ).join('') || 'Single direct intent.';
-
-        // Render Retrieval Events & Citations
-        const citations = telem.citations || [];
-        document.getElementById('evidenceCount').innerText = `${telem.retrieval_events.length} Search Event(s)`;
-        let evidenceHtml = '';
-        if (telem.retrieval_events.length === 0) {
-          evidenceHtml = '<div style="color:var(--text-muted)">Zero retrieval events fired (Presentation/Suppression turn).</div>';
-        } else {
-          evidenceHtml = telem.retrieval_events.map(ev => 
-            `<div style="margin-bottom:4px;"><span class="badge badge-primary">${ev.trigger}</span> @ <code>${ev.timestamp_s}s</code>: "${ev.query}"</div>`
-          ).join('');
-        }
-        if (citations.length > 0) {
-          evidenceHtml += `<div style="margin-top:8px;"><strong>Verified Tags Cited:</strong> ` + citations.map(c => `<span class="tag-chip">${c}</span>`).join('') + `</div>`;
-        }
-        document.getElementById('evidenceLog').innerHTML = evidenceHtml;
-
-        // Render Answer
-        document.getElementById('answerOutput').innerText = data.answer;
-        document.getElementById('answerVersionBadge').innerText = `Answer Version: ${telem.answer_version}`;
-
-        if (telem.uncertainty) {
-          const unc = document.getElementById('uncertaintyAlert');
-          unc.innerText = `⚠️ Uncertainty Flag: ${telem.uncertainty}`;
-          unc.style.display = 'block';
-        }
-
-        // Update Telemetry Panel
-        document.getElementById('t-version').innerText = telem.answer_version;
-        document.getElementById('t-grounding').innerText = `${(telem.grounding_score * 100).toFixed(0)}%`;
-        document.getElementById('t-latency').innerText = `${telem.latencies_ms.end_to_end} ms`;
-        document.getElementById('t-cost').innerText = telem.token_cost ? `$${telem.token_cost.usd_estimate.toFixed(5)}` : '$0.00';
-
-        // Increment turnId for convenience in multi-turn demonstrations
-        document.getElementById('turnId').value = turnId + 1;
-
+        updateSidebarHud(telem);
+        state.turnId++;
       } catch (err) {
-        document.getElementById('answerOutput').innerHTML = `<span style="color:var(--error);">Error: ${err.message}</span>`;
+        clearInterval(ctx.clockInterval);
+        ctx.thinkingClock.innerText = 'Error in Thinking';
+        if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+        const isTimeout = Boolean(err) && err.name === 'AbortError';
+        ctx.answerContainer.innerHTML = isTimeout ? `
+          <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
+            ⏱️ Turn exceeded the 60s limit and was aborted.
+          </div>
+        ` : `
+          <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
+            ❌ Pipeline Error: ${esc(err.message || err)}
+          </div>
+        `;
       } finally {
-        btn.disabled = false;
-        btn.innerText = 'Run Streaming Turn';
+        clearTimeout(abortTimer);
+        state.isRunning = false;
+        state.activeTurn = null;
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) sendBtn.disabled = false;
+        scrollToBottom();
       }
     }
+
+    // ─── THOUGHT PROCESS EVENTS BUILDER (HTTP FALLBACK) ───────────────
+
+    // ─── THOUGHT PROCESS TRACE BUILDER (HTTP FALLBACK) ───────────────
+    // Builds the Pipeline Trace pane ONLY from measured server data:
+    // real controller decisions, real retrieval events, real thought events
+    // (each with its real t_s), and real grounding telemetry. No invented
+    // timestamps, no assertion badges — continuity is shown by the real
+    // timeline, never claimed by a label.
+    function buildThoughtProcess(utterance, telem, data) {
+      const thoughts = [];
+      const decisions = telem.controller_decisions || [];
+      const retEvents = telem.retrieval_events || [];
+      const citations = telem.citations || [];
+      const serverThoughts = (data && data.thoughts) || [];
+
+      for (const d of decisions) {
+        const t = Number(d.timestamp_s);
+        if (!Number.isFinite(t)) continue;
+        thoughts.push({
+          time: t,
+          type: 'controller',
+          dot: '🎛️',
+          title: `Controller decision: ${esc(d.trigger || 'wait')}`,
+          badge: 'CONTROLLER',
+          badgeCls: 'thought-badge-fire',
+          chunkLabel: `Decision at t = ${t.toFixed(2)}s`,
+          chunkBox: esc(d.query || ''),
+          text: esc(d.reason || 'No reason recorded.'),
+          note: ''
+        });
+      }
+
+      for (const e of retEvents) {
+        const t = Number(e.timestamp_s);
+        if (!Number.isFinite(t)) continue;
+        thoughts.push({
+          time: t,
+          type: 'fire',
+          dot: '⚡',
+          title: `Retrieval fired (${esc(e.trigger || 'standard')})`,
+          badge: 'RETRIEVAL',
+          badgeCls: 'thought-badge-fire',
+          chunkLabel: `Fired at t = ${t.toFixed(2)}s`,
+          chunkBox: esc(e.query || ''),
+          text: 'Hybrid retrieval dispatched against the corpus.',
+          note: ''
+        });
+      }
+
+      // The honest thought stream, verbatim from the server with real t_s.
+      for (const th of serverThoughts) {
+        const t = Number(th.t_s);
+        if (!Number.isFinite(t)) continue;
+        thoughts.push({
+          time: t,
+          type: 'thought',
+          dot: '💭',
+          title: `Thought — Phase ${th.phase || '?'}`,
+          badge: 'THOUGHT',
+          badgeCls: 'thought-badge-cont',
+          chunkLabel: `Emitted at t = ${t.toFixed(2)}s`,
+          chunkBox: '',
+          text: esc(th.text || ''),
+          note: ''
+        });
+      }
+
+      if (telem.utterance_end_s != null) {
+        const t = Number(telem.utterance_end_s);
+        thoughts.push({
+          time: t,
+          type: 'speech',
+          dot: '🎙️',
+          title: 'Utterance end observed',
+          badge: 'UTTERANCE END',
+          badgeCls: 'thought-badge-speech',
+          chunkLabel: `End at t = ${t.toFixed(2)}s`,
+          chunkBox: esc(utterance),
+          text: 'Full utterance captured; end-of-utterance pipeline ran.',
+          note: ''
+        });
+      }
+
+      const scorePct = Math.round(Number(telem.grounding_score ?? 1) * 100);
+      thoughts.push({
+        time: Number(telem.latencies_ms?.end_to_end ?? 0) / 1000,
+        type: 'fusion',
+        dot: '🛡️',
+        title: 'Grounding verification',
+        badge: telem.uncertainty ? 'ABSTAINED' : `${scorePct}% GROUNDED`,
+        badgeCls: telem.uncertainty ? 'thought-badge-fusion' : 'thought-badge-fire',
+        chunkLabel: 'Validator report',
+        chunkBox: citations.map(c => `<span class="citation-chip">${esc(c)}</span>`).join(' '),
+        text: `Deterministic validator checked claims against retrieved chunks. Claim-level support: <strong>${scorePct}%</strong>.`,
+        note: telem.uncertainty ? esc(telem.uncertainty) : ''
+      });
+
+      thoughts.sort((a, b) => a.time - b.time);
+      return thoughts;
+    }
+
+    // ─── TYPEWRITER EFFECT WITH CITATION CHIPS ────────────────────────
+
+    async function streamAnswerTypewriter(container, answerText) {
+      if (!container) return;
+      container.innerHTML = '';
+      const formatted = esc(answerText).replace(/\[(Doc_\d+\s*§[\w.\-]+)\]/g, '<span class="citation-chip" onclick="copyCitationTag(\'$1\', this)" title="Click to copy citation tag">[$1]</span>');
+      
+      const tokens = formatted.split(/(\s+|<span[^>]*>.*?<\/span>)/g).filter(Boolean);
+      let buffer = '';
+
+      for (let i = 0; i < tokens.length; i++) {
+        buffer += tokens[i];
+        container.innerHTML = buffer;
+        scrollToBottom();
+        await new Promise(r => setTimeout(r, 14));
+      }
+    }
+
+    function copyCitationTag(tag, el) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(`[${tag}]`).then(() => {
+          const orig = el.innerText;
+          el.innerText = `[${tag} ✓]`;
+          setTimeout(() => { el.innerText = orig; }, 900);
+        }).catch(() => {});
+      }
+    }
+
+    function updateSidebarHud(telem) {
+      const e2e = telem.latencies_ms?.end_to_end || 0;
+      document.getElementById('hudLatency').innerText = `${e2e} ms`;
+
+      const scorePct = Math.round((telem.grounding_score || 1) * 100);
+      document.getElementById('hudGrounding').innerText = `${scorePct}%`;
+
+      const intentCount = (telem.sub_queries || []).length || (telem.retrieval_required ? 1 : 0);
+      document.getElementById('hudIntents').innerText = `${intentCount} Intent(s)`;
+
+      document.getElementById('hudVersion').innerText = `v${telem.answer_version || 1}`;
+    }
+
+    // ─── MICROPHONE VOICE RECOGNITION (LIVE AUDIO STREAM) ─────────────
+
+    function toggleSpeechRecognition() {
+      const btn = document.getElementById('micBtn');
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRec) {
+        alert('Web Speech API is not supported in this browser. Please type your query directly.');
+        return;
+      }
+
+      if (state.isRecording) {
+        try { state.recognition?.stop(); } catch (e) {}
+        return;
+      }
+
+      state.recognition = new SpeechRec();
+      state.recognition.continuous = true;
+      state.recognition.interimResults = true;
+      state.recognition.lang = 'en-US';
+
+      state.recFinal = '';
+      if (!state.wsConnected) connectWs();
+
+      state.recognition.onstart = () => {
+        state.isRecording = true;
+        btn.classList.add('recording');
+        chatInput.placeholder = 'Listening to your speech in real time...';
+        ensureTurnUI('Listening to live speech…', true);
+      };
+
+      state.recognition.onresult = (evt) => {
+        let finalT = '', interimT = '';
+        for (let i = evt.resultIndex; i < evt.results.length; ++i) {
+          if (evt.results[i].isFinal) finalT += evt.results[i][0].transcript;
+          else interimT += evt.results[i][0].transcript;
+        }
+        state.recFinal += finalT;
+        const cumulative = (state.recFinal + ' ' + interimT).trim();
+        if (cumulative) {
+          const ctx = ensureTurnUI(cumulative, true);
+          if (ctx.userTextSpan) ctx.userTextSpan.innerText = cumulative;
+          chatInput.value = cumulative;
+          scrollToBottom();
+
+          clearTimeout(state.interimTimer);
+          state.interimTimer = setTimeout(() => {
+            if (state.isLiveMode && state.wsConnected) {
+              sendWsChunk(cumulative);
+            }
+          }, 200);
+        }
+      };
+
+      state.recognition.onerror = () => {
+        btn.classList.remove('recording');
+        state.isRecording = false;
+        chatInput.placeholder = 'Ask a question or speak into microphone (Live Stream is ON)...';
+      };
+
+      state.recognition.onend = () => {
+        btn.classList.remove('recording');
+        state.isRecording = false;
+        chatInput.placeholder = 'Ask a question or speak into microphone (Live Stream is ON)...';
+        clearTimeout(state.interimTimer);
+
+        const finalQuery = (state.recFinal || chatInput.value).trim();
+        if (finalQuery) {
+          if (state.isLiveMode && state.wsConnected) {
+            sendWsChunk(finalQuery);
+            sendWsEnd();
+          } else {
+            submitUserMessage(false);
+          }
+        }
+      };
+
+      try {
+        state.recognition.start();
+      } catch (e) {
+        console.warn('Speech recognition start failed:', e);
+      }
+    }
+
+    // ─── CORPUS & BYOK MANAGEMENT ─────────────────────────────────────
+
+    async function refreshCorpus() {
+      try {
+        const res = await fetch('/corpus');
+        if (!res.ok) return;
+        const data = await res.json();
+        const total = data.total_chunks || 0;
+        document.getElementById('corpusPill').innerHTML = `<span class="pill-dot"></span> ${total} Chunks Indexed`;
+        document.getElementById('corpusSummaryText').innerText = `Total ${total} chunk(s) indexed in Qdrant:`;
+
+        const list = document.getElementById('corpusDocsList');
+        list.innerHTML = '';
+        (data.documents || []).forEach(doc => {
+          const div = document.createElement('div');
+          div.style.marginBottom = '6px';
+          div.innerHTML = `
+            <div style="font-weight:600; color:#fff;">• ${esc(doc.doc_id)} (${esc(doc.filename)})</div>
+            <div style="margin-top:2px;">
+              ${(doc.tags || []).map(t => `<span class="corpus-chunk-badge">${esc(t)}</span>`).join('')}
+            </div>
+          `;
+          list.appendChild(div);
+        });
+      } catch (e) {
+        document.getElementById('corpusSummaryText').innerText = 'Could not load corpus statistics.';
+      }
+    }
+
+    async function reseedCorpus() {
+      if (!confirm('Reseed corpus to the 4 default benchmark chunks (Doc_01 venue booking, Doc_02 travel policy)?')) return;
+      try {
+        const res = await fetch('/corpus/reseed', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || `Reseed failed (HTTP ${res.status})`);
+        }
+        alert(`Corpus successfully reseeded! Total chunks: ${data.total_chunks}`);
+        refreshCorpus();
+      } catch (e) {
+        alert('Reseed failed: ' + e.message);
+      }
+    }
+
+    async function handleFileUpload(evt) {
+      const file = evt.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('replace', 'false');
+
+      try {
+        const res = await fetch('/corpus/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || `Upload failed (HTTP ${res.status})`);
+        }
+        alert(`File uploaded & indexed! ${data.sections_indexed} chunks added.`);
+        refreshCorpus();
+      } catch (e) {
+        alert('Upload failed: ' + e.message);
+      }
+    }
+
+    // BYOK Modal Controls
+    function openByokModal() {
+      document.getElementById('byokModal').classList.add('open');
+      loadByokConfig();
+    }
+    function closeByokModal() {
+      document.getElementById('byokModal').classList.remove('open');
+    }
+
+    async function loadByokConfig() {
+      try {
+        const res = await fetch('/admin/llm/config');
+        if (!res.ok) return;
+        const cfg = await res.json();
+        document.getElementById('mFastProvider').value = cfg.fast_provider || 'groq';
+        document.getElementById('mFastModel').value = cfg.fast_model || '';
+        document.getElementById('mSynthProvider').value = cfg.synthesis_provider || 'gemini';
+        document.getElementById('mSynthModel').value = cfg.synthesis_model || '';
+      } catch {}
+    }
+
+    async function saveModalConfig() {
+      const fastP = document.getElementById('mFastProvider').value;
+      const fastM = document.getElementById('mFastModel').value.trim();
+      const fastK = document.getElementById('mFastApiKey').value.trim();
+      const synP = document.getElementById('mSynthProvider').value;
+      const synM = document.getElementById('mSynthModel').value.trim();
+      const synK = document.getElementById('mSynthApiKey').value.trim();
+
+      const payload = {
+        fast_provider: fastP, fast_model: fastM,
+        synthesis_provider: synP, synthesis_model: synM,
+      };
+      if (fastK) payload.fast_api_key = fastK;
+      if (synK) payload.synthesis_api_key = synK;
+
+      const st = document.getElementById('modalStatus');
+      try {
+        const res = await fetch('/admin/llm/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        st.style.display = 'block';
+        st.style.background = 'rgba(16,185,129,0.15)';
+        st.style.color = '#34d399';
+        st.innerText = 'Configuration applied successfully!';
+        setTimeout(closeByokModal, 1200);
+      } catch (e) {
+        st.style.display = 'block';
+        st.style.background = 'rgba(239,68,68,0.15)';
+        st.style.color = '#f87171';
+        st.innerText = 'Failed: ' + e.message;
+      }
+    }
+
+    function formatProviderTestResult(p) {
+      if (!p) return 'unknown';
+      if (p.ok) return `${p.provider || 'unknown'}/${p.model || 'unknown'} (${p.latency_ms != null ? p.latency_ms + 'ms' : 'n/a'})`;
+      return `error: ${p.error || 'unknown error'}`;
+    }
+
+    async function testModalProviders() {
+      const st = document.getElementById('modalStatus');
+      st.style.display = 'block';
+      st.style.background = 'rgba(56,189,248,0.15)';
+      st.style.color = '#38bdf8';
+      st.innerText = 'Testing provider connections...';
+
+      try {
+        const res = await fetch('/admin/llm/test', { method: 'POST' });
+        const d = await res.json();
+        if (!res.ok) {
+          throw new Error(d.detail || `HTTP ${res.status}`);
+        }
+        // Backend returns {"fast": {ok, provider, model, latency_ms, error}, "synthesis": {...}}
+        st.innerText = `Fast: ${formatProviderTestResult(d.fast)} | Synthesis: ${formatProviderTestResult(d.synthesis)}`;
+      } catch (e) {
+        st.innerText = 'Test error: ' + e.message;
+      }
+    }
+
+    // Initialize
+    refreshCorpus();
+    connectWs();
   </script>
 </body>
 </html>

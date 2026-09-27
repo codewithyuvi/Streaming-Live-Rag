@@ -1,10 +1,11 @@
-# ADR-4: LLM Provider — Dual-Provider Architecture (Groq + Gemini)
+# ADR-4: LLM Provider — Dual-Provider Architecture with Dynamic BYOK Configuration
 
-**Status:** Accepted & Implemented (Audited September 23, 2026)
+**Status:** Accepted, Implemented & Extended (September 2026)
 
-**Decision:** We implement a **Dual-Provider Architecture**:
-1. **Groq (`openai/gpt-oss-20b` / `groq/compound-mini` / `llama-3.1-8b-instant`)** via centralized `llm_config.py`: Handles all latency-sensitive operations (Streaming Controller deciding `trigger_now` / `wait` / `no_retrieval_needed`, Multi-Intent Decomposer, and Session Refinement Classifier).
-2. **Gemini (`gemini-3.8-flash` / `gemini-2.5-flash`)** via official `google-genai` SDK: Handles final Session-Aware Synthesis, complex reasoning, and grounded citation generation.
+**Decision:** We implement a **Dual-Provider Architecture** supplemented with dynamic runtime **BYOK (Bring Your Own Key)** configuration:
+1. **Fast Controller Provider (Groq / OpenAI-compatible / Ollama):** Default model `openai/gpt-oss-20b` or `llama-3.1-8b-instant` via centralized `llm_config.py`. Handles all latency-sensitive operations (Streaming Controller deciding `trigger_now` / `wait` / `no_retrieval_needed`, Multi-Intent Decomposer, and Session Refinement Classifier) at sub-400ms turnaround.
+2. **Quality Synthesis Provider (Gemini / Claude / OpenAI):** Default model `gemini-3.5-flash-lite` or `gemini-2.5-flash` via official `google-genai` SDK. Handles final Session-Aware Synthesis, complex reasoning, and claim-level citation generation.
+3. **Dynamic BYOK & Provider Switching (`/config/llm`):** Providers, models, base URLs, and API keys can be updated at runtime without restarting the server. Sensitive API keys are treated as write-only and are strictly masked in read endpoints.
 
 ---
 
@@ -19,19 +20,16 @@ Groq's LPU (Language Processing Unit) hosting offers generation latencies of **~
 
 ---
 
-### Centralized Client & Resilience Architecture (C1, M4)
+### Centralized Client & Resilience Architecture
 To prevent runtime crashes and handle transient cloud issues during judging:
-- All Groq calls are centralized through `llm_config.call_fast()`.
+- All fast calls route through `llm_config.call_fast()`.
 - **Transient-Only Retries:** The wrapper retries only transient errors (`429`, `500`, `502`, `503`, timeouts) with exponential backoff and randomized jitter.
 - **Fail Loudly:** Authentication, invalid model IDs, or schema mismatches fail immediately with descriptive errors rather than silently degrading.
 - **Client Lazy Loading:** Clients are initialized on first invocation to prevent import-time crashes in test runners.
+- **Connection Test Endpoint (`POST /config/llm/test`):** Allows users and reviewers to ping configured providers directly from the UI or terminal to verify credentials and measure live round-trip latency.
 
 ---
 
 ### Model Evolution & Fallback Matrix
-- **Decommissioned:** `llama3-8b-8192` (decommissioned by Groq in 2025/2026).
-- **Fast Controller Primary:** `openai/gpt-oss-20b` (fallback: `groq/compound-mini` or `llama-3.1-8b-instant`).
-- **Synthesis Primary:** `gemini-3.8-flash` (fallback: `gemini-2.5-flash`).
-
-Both keys (`GROQ_API_KEY` and `GEMINI_API_KEY`) are managed in `.env` and loaded at runtime.
-
+- **Fast Controller Primary:** `openai/gpt-oss-20b` / `llama-3.1-8b-instant` (fallbacks: `llama-3.3-70b-versatile`, local Ollama).
+- **Synthesis Primary:** `gemini-3.5-flash-lite` / `gemini-2.5-flash` (fallbacks: `gemini-3.8-flash`, `gemini-2.0-flash`).

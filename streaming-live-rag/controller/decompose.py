@@ -14,6 +14,7 @@ Design decisions:
 import os
 import sys
 import json
+import re
 
 # Ensure parent directory is on sys.path for llm_config import
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -21,9 +22,9 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 try:
-    from llm_config import call_fast, FAST_LLM_MODEL
+    from llm_config import call_fast
 except ImportError:
-    from ..llm_config import call_fast, FAST_LLM_MODEL
+    from ..llm_config import call_fast
 
 MAX_SUB_QUERIES = 4
 
@@ -66,6 +67,7 @@ Examples:
 - "I need the gym membership fee, the pool schedule, and the guest parking policy" → 3 sub-queries
 """
 
+    response = None
     try:
         response = call_fast(
             messages=[
@@ -74,14 +76,35 @@ Examples:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=300
+            max_tokens=600
         )
     except Exception as e:
-        # Fallback: treat the whole utterance as a single query and mark degraded
-        return [{"sub_query": utterance, "intent": "fallback_single", "degraded": True, "error": str(e)}]
+        # If Groq server-side json validation fails or limits tokens, retry cleanly
+        try:
+            response = call_fast(
+                messages=[
+                    {"role": "system", "content": system_prompt + "\nOutput strictly valid JSON with no markdown formatting."},
+                    {"role": "user", "content": utterance}
+                ],
+                temperature=0.0,
+                max_tokens=600
+            )
+        except Exception as e2:
+            return [{"sub_query": utterance, "intent": "fallback_single", "degraded": True, "error": str(e2)}]
 
     try:
-        result = json.loads(response.choices[0].message.content)
+        raw_text = response.choices[0].message.content.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
+        try:
+            result = json.loads(raw_text)
+        except Exception:
+            m = re.search(r"\{.*\}", raw_text, re.DOTALL)
+            if m:
+                result = json.loads(m.group(0))
+            else:
+                raise
         sub_queries = result.get("sub_queries", [])
 
         # Validate and enforce cap
@@ -100,7 +123,15 @@ Examples:
                     "intent": str(sq.get("intent", "sub_intent")).strip()
                 })
 
-        # If decomposer returned nothing but there's real content (>2 words and not pure greeting), use original
+        # If decomposer explicitly returned an empty list (Rule 6: chit-chat/greeting),
+        # respect it rather than forcing a fallback search query
+        if not validated and isinstance(sub_queries, list) and len(sub_queries) == 0:
+            q_words = {"what", "when", "where", "who", "why", "how", "which"}
+            first_words = set(utterance.lower().split()[:3])
+            if not (first_words & q_words):
+                return []
+            return [{"sub_query": utterance, "intent": "single"}]
+
         if not validated and len(utterance.split()) > 2:
             return [{"sub_query": utterance, "intent": "single"}]
 

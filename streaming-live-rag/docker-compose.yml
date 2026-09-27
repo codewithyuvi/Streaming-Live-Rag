@@ -1,4 +1,4 @@
-﻿services:
+services:
   qdrant:
     image: qdrant/qdrant:v1.13.2
     ports:
@@ -32,9 +32,9 @@
     environment:
       - QDRANT_URL=http://qdrant:6333
       - COLLECTION_NAME=dev_corpus_dense
-      - FAST_LLM_MODEL=${FAST_LLM_MODEL:-openai/gpt-oss-20b}
+      - FAST_LLM_MODEL=${FAST_LLM_MODEL:-llama-3.1-8b-instant}
       - GROQ_API_KEY=${GROQ_API_KEY}
-      - SYNTHESIS_LLM_MODEL=${SYNTHESIS_LLM_MODEL:-gemini-3.8-flash}
+      - SYNTHESIS_LLM_MODEL=${SYNTHESIS_LLM_MODEL:-gemini-2.5-flash}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
     depends_on:
       qdrant:
@@ -43,10 +43,10 @@
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 5s
+      retries: 12
+      start_period: 60s
 
 volumes:
   qdrant_data:

@@ -1,185 +1,134 @@
 """
-Gate 4 — Grounding Validation (G4)
+Gate 4 — Factual Grounding (G4).
 
-Validates that the LLM's synthesis output is properly grounded:
-  1. All citation tags in the answer exist in the provided context
-  2. Zero fabricated Doc IDs or Section numbers
-  3. Uncertainty is expressed when the corpus doesn't cover a query
+Validates the ACTUAL synthesis output of the pipeline — never hand-written
+strings. Each grounding_probes scenario in eval/labeled_set.yaml runs a real
+turn through run_live_turn() with real retrieval (Qdrant dev corpus) and real
+synthesis (Gemini). The produced answer is then:
 
-This gate tests the grounding validator itself (not the LLM) by running
-it against synthetic answer strings with known citation patterns.
+  1. scored with retrieval.grounding.validate (claim-level support), and
+  2. cross-checked independently: every citation tag in the answer must exist
+     in the dev-corpus tag inventory (zero fabricated IDs).
 
-Target: G4 ≥ 85% citation support, zero fabricated IDs.
+SKIP (exit 2) when GEMINI_API_KEY is absent, or when Qdrant/the indexed
+corpus is unreachable (grounding cannot be measured without retrieval).
+Threshold: >= 85% mean citation support, zero fabricated IDs.
 """
 
+import asyncio
 import os
+import re
 import sys
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-from retrieval.grounding import validate_grounding
+from dotenv import load_dotenv
+load_dotenv()
+
+from eval.gates._common import (
+    banner, footer, require_env, gate_main, GateSkipped, retrieval_preflight,
+    STATUS_PASS, STATUS_FAIL,
+)
+from eval.dataset_loader import load_labeled_set
+from streaming.engine import run_live_turn, EngineDeps
+from streaming.live_stream import play_utterance
+from retrieval.grounding import tags_in
+
+THRESHOLD = 0.85
+TAG_RE = re.compile(r"Doc_\d+\s*§[\d.]+")
+ABSTAIN_PHRASE = "not available in the provided documents"
+
+
+def _corpus_tag_inventory() -> set:
+    """Every citation tag actually present in the dev corpus files."""
+    corpus_dir = os.path.join(ROOT_DIR, "data", "dev_corpus")
+    tags = set()
+    if not os.path.isdir(corpus_dir):
+        return tags
+    for fn in os.listdir(corpus_dir):
+        if not fn.endswith((".txt", ".md")):
+            continue
+        with open(os.path.join(corpus_dir, fn), "r", encoding="utf-8") as f:
+            for m in TAG_RE.finditer(f.read()):
+                tags.add(m.group(0).replace("  ", " ").strip())
+    # normalize whitespace the same way grounding.canon does
+    return {" ".join(t.split()) for t in tags}
+
+
+def _retrieval_preflight() -> None:
+    """Grounding is unmeasurable without a live retrieval backend."""
+    retrieval_preflight()
 
 
 def evaluate_g4():
-    """
-    Runs the grounding validator against a suite of synthetic test answers
-    with known-good and known-bad citation patterns.
-    """
+    require_env("GEMINI_API_KEY")
+    _retrieval_preflight()
+    data = load_labeled_set()
+    probes = data.get("grounding_probes", [])
+    if not probes:
+        raise GateSkipped("no grounding_probes in labeled_set.yaml")
+    inventory = _corpus_tag_inventory()
 
-    available_tags = ["Doc_01 §1", "Doc_01 §2", "Doc_02 §1", "Doc_02 §2"]
+    banner("GATE 4 — Factual Grounding on real synthesis output (G4)")
+    print(f"Corpus tag inventory: {len(inventory)} tags")
 
-    test_cases = [
-        # --- Valid cases ---
-        {
-            "name": "Perfect single citation",
-            "answer": "The venue capacity is 30 [Doc_01 §1].",
-            "expect_grounded": True,
-            "expect_fabricated": 0,
-        },
-        {
-            "name": "T1: No space before §",
-            "answer": "The venue capacity is 30 [Doc_01§1].",
-            "expect_grounded": True,
-            "expect_fabricated": 0,
-        },
-        {
-            "name": "T2: Combined bracket citation",
-            "answer": "The venue and travel policies apply [Doc_01 §1, Doc_01 §2].",
-            "expect_grounded": True,
-            "expect_fabricated": 0,
-        },
-        {
-            "name": "Multiple valid citations",
-            "answer": "The capacity is 30 [Doc_01 §1]. Travel requires Director approval [Doc_02 §1].",
-            "expect_grounded": True,
-            "expect_fabricated": 0,
-        },
-        {
-            "name": "All four valid tags used",
-            "answer": "Venue: 30 people [Doc_01 §1], cancel 48h [Doc_01 §2]. Travel: Director [Doc_02 §1], VP exception [Doc_02 §2].",
-            "expect_grounded": True,
-            "expect_fabricated": 0,
-        },
-        {
-            "name": "Valid citation with uncertainty for partial answer",
-            "answer": "The capacity is 30 [Doc_01 §1]. Parking information is not available in the provided documents.",
-            "expect_grounded": True,
-            "expect_fabricated": 0,
-        },
-        {
-            "name": "T7: Pure uncertainty (no citations needed)",
-            "answer": "This information is not available in the provided documents.",
-            "expect_grounded": True,
-            "expect_fabricated": 0,
-        },
-        # --- Fabrication cases ---
-        {
-            "name": "Fabricated Doc ID",
-            "answer": "The answer is X [Doc_03 §1].",
-            "expect_grounded": False,
-            "expect_fabricated": 1,
-        },
-        {
-            "name": "T3: Fabricated section-less ID",
-            "answer": "The answer is X [Doc_99].",
-            "expect_grounded": False,
-            "expect_fabricated": 1,
-        },
-        {
-            "name": "T4: Fabricated citation with parentheses",
-            "answer": "The answer is X (Doc_99 §1).",
-            "expect_grounded": False,
-            "expect_fabricated": 1,
-        },
-        {
-            "name": "Fabricated Section number",
-            "answer": "The answer is X [Doc_01 §5].",
-            "expect_grounded": False,
-            "expect_fabricated": 1,
-        },
-        {
-            "name": "Mix of valid and fabricated",
-            "answer": "Capacity is 30 [Doc_01 §1]. Also see [Doc_99 §3].",
-            "expect_grounded": False,
-            "expect_fabricated": 1,
-        },
-        {
-            "name": "Multiple fabricated tags",
-            "answer": "See [Doc_05 §1] and [Doc_06 §2].",
-            "expect_grounded": False,
-            "expect_fabricated": 2,
-        },
-        # --- Edge cases ---
-        {
-            "name": "No citations and no uncertainty (bad)",
-            "answer": "The venue can hold 30 people.",
-            "expect_grounded": False,
-            "expect_fabricated": 0,
-        },
-    ]
-
-    passed = 0
-    failed = 0
+    deps = EngineDeps.defaults()
+    supports = []
+    fabricated_total = 0
     details = []
+    for p in probes:
+        res = asyncio.run(run_live_turn(
+            f"g4_{p['id']}",
+            play_utterance(p["utterance"],
+                           words_per_chunk=p.get("words_per_chunk", 3),
+                           ms_per_chunk=p.get("ms_per_chunk", 50)),
+            deps=deps,
+            sink=lambda e: None,
+        ))
+        t = res.telemetry
+        rep = t.grounding_report or {}
+        cited = tags_in(res.answer)
+        cited_norm = {" ".join(c.split()) for c in cited}
+        fabricated_inv = sorted(cited_norm - inventory)
+        fabricated_val = rep.get("fabricated_tags", []) or []
+        fabricated_total += len(fabricated_inv) + len(fabricated_val)
+        support = float(rep.get("score", 0.0))
 
-    for tc in test_cases:
-        report = validate_grounding(tc["answer"], available_tags)
-
-        grounded_ok = report.is_grounded == tc["expect_grounded"]
-        fabricated_ok = len(report.fabricated_tags) == tc["expect_fabricated"]
-        case_passed = grounded_ok and fabricated_ok
-
-        if case_passed:
-            passed += 1
-            status = "✅"
+        if p.get("expect_abstain"):
+            abstained = (ABSTAIN_PHRASE in res.answer or bool(t.uncertainty)
+                         or bool(rep.get("abstained")))
+            ok = bool(abstained) and not fabricated_inv and not fabricated_val
+            note = f"abstained={'yes' if abstained else 'no'}"
         else:
-            failed += 1
-            status = "❌"
+            supports.append(support)
+            ok = support >= THRESHOLD and not fabricated_inv and not fabricated_val
+            note = f"support={support:.2f}"
 
-        details.append({
-            "name": tc["name"],
-            "status": status,
-            "grounded": report.is_grounded,
-            "expected_grounded": tc["expect_grounded"],
-            "fabricated": report.fabricated_tags,
-            "expected_fabricated_count": tc["expect_fabricated"],
-            "score": report.score,
-        })
+        details.append({"id": p["id"], "ok": ok, "note": note,
+                        "fabricated": fabricated_inv + fabricated_val,
+                        "answer": res.answer[:160]})
 
-    total = passed + failed
-    score = (passed / total * 100) if total > 0 else 0
-
-    print("=" * 70)
-    print("    GATE 4 — Grounding Validation (G4)")
-    print("=" * 70)
-    print(f"\n📊 G4 Score: {score:.1f}% ({passed}/{total}) — Target: ≥ 85%")
-    print(f"{'─' * 70}")
-
+    mean_support = sum(supports) / len(supports) if supports else 1.0
+    print(f"\nMean citation support: {mean_support:.1%} — target >= {THRESHOLD:.0%}")
+    print(f"Fabricated IDs: {fabricated_total} — target 0")
+    print("-" * 70)
     for d in details:
-        print(f"  {d['status']} {d['name']}")
-        print(f"     Grounded: {d['grounded']} (expected {d['expected_grounded']})")
-        print(f"     Fabricated: {d['fabricated']} (expected count {d['expected_fabricated_count']})")
-        print(f"     Score: {d['score']:.2f}")
-        print()
+        icon = "OK  " if d["ok"] else "BAD "
+        print(f"  [{icon}] {d['id']}: {d['note']}")
+        if d["fabricated"]:
+            print(f"          FABRICATED: {d['fabricated']}")
+        print(f"          answer: {d['answer']}")
 
-    gate_passed = score >= 85 and all(
-        d["expected_fabricated_count"] == 0 or len(d["fabricated"]) > 0
-        for d in details
-        if d["expected_fabricated_count"] > 0
-    )
-
-    print(f"{'=' * 70}")
-    if gate_passed:
-        print("🟢 GATE 4 PASSED")
-    else:
-        print("🔴 GATE 4 FAILED")
-    print(f"{'=' * 70}")
-
-    return gate_passed
+    ok = mean_support >= THRESHOLD and fabricated_total == 0
+    footer(ok, "GATE 4")
+    metric = f"{mean_support:.1%} support, {fabricated_total} fabricated"
+    return (STATUS_PASS if ok else STATUS_FAIL), metric
 
 
 if __name__ == "__main__":
-    evaluate_g4()
+    sys.exit(gate_main("G4", evaluate_g4))

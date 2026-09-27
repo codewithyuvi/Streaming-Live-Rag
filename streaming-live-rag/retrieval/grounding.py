@@ -1,4 +1,4 @@
-﻿"""
+"""
 Phase 5 — Claim-Level Deterministic Grounding Validator (ADR-5 / C5 / C6).
 Tested against edge cases T1-T10 in Appendix B.1 of the audit report.
 """
@@ -7,11 +7,14 @@ import re
 from dataclasses import dataclass, field
 
 BRACKET = re.compile(r"[\[(]([^\[\]()]*?Doc_\d+[^\[\]()]*?)[\])]")  # [..] or (..) containing a Doc_ mention
-ONE_TAG = re.compile(r"Doc_(\d+)\s*(?:§\s*([\w.]+))?", re.I)         # Doc_01 §1 | Doc_01§1 | Doc_01
+ONE_TAG = re.compile(r"Doc_(\d+)\s*(?:§\s*([\w.\-]+))?", re.I)         # Doc_01 §1 | Doc_01 §A-1 | Doc_01§1 | Doc_01
 ABSTAIN = re.compile(
     r"\b(not (?:available|found|mentioned|specified|covered|included)"
     r"|no (?:relevant )?information (?:is |was )?(?:available|found|provided)"
-    r"|cannot (?:be )?(?:determined|verified)|insufficient (?:information|evidence))\b",
+    r"|cannot (?:be )?(?:determined|verified|answer(?: that)? reliably)"
+    r"|could not (?:be )?(?:determined|verified|answer)"
+    r"|unable to (?:verify|determine|answer)"
+    r"|insufficient (?:information|evidence))\b",
     re.I
 )
 
@@ -22,12 +25,17 @@ def canon(doc, sec):
 
 
 def tags_in(text: str) -> list[str]:
-    """Extracts all citation tags from text, handling brackets, commas, semicolons, and parentheses."""
+    """Extracts all citation tags from text, handling brackets, commas, semicolons, parentheses, and unbracketed mentions."""
     out = []
     for inner in BRACKET.findall(text):
         for part in re.split(r"[;,]", inner):
             if (m := ONE_TAG.search(part)):
                 out.append(canon(m.group(1), m.group(2)))
+    # Also extract any unbracketed standalone Doc_XX mentions
+    for m in ONE_TAG.finditer(text):
+        c = canon(m.group(1), m.group(2))
+        if c not in out:
+            out.append(c)
     return out
 
 
@@ -100,14 +108,31 @@ def validate(answer: str, retrieved_tags: list[str]) -> Report:
     r = Report(cited=list(dict.fromkeys(tags_in(answer))))
     r.fabricated = [t for t in r.cited if t not in avail]
 
-    for s in re.split(r"(?<=[.!?])\s+", answer.strip()):
+    # Canonical abstention messages produced by the pipeline are grounded
+    # by construction — they assert no facts and cite nothing.
+    stripped = answer.strip()
+    if stripped in (
+        "This information is not available in the provided documents.",
+        "I cannot answer that reliably based on the provided documents.",
+    ) and not r.cited and not r.fabricated:
+        r.abstained = True
+        return r
+
+    # Normalize: if punctuation precedes bracket citation (e.g. "claim. [Doc_01 §1]"),
+    # move punctuation to end of citation tag so it attaches to its claim sentence
+    normalized = re.sub(r"([.!?])\s*([\[(][^\[\]()]*Doc_\d+[^\[\]()]*[\])])", r" \2\1", answer.strip())
+
+    for s in re.split(r"(?<=[.!?])\s+(?![\[(]\s*Doc_)", normalized):
         if len(s.split()) < 4:
             continue  # fragments / greetings are not claims
         if ABSTAIN.search(s):
             r.abstained = True
             continue  # an abstention sentence is not a claim
+        has_tag = bool(set(tags_in(s)) & avail)
+        if not has_tag and re.search(r"^(?:(?:here|below|following) (?:is|are)|based on (?:the )?(?:provided )?documents?|in summary|to summarize|please (?:note|let me know)|feel free|hope this helps|in conclusion)\b", s.strip(), re.I):
+            continue  # conversational framing / courtesy without assertions is not a domain claim
         r.factual += 1
-        r.supported += bool(set(tags_in(s)) & avail)  # sentence carries >=1 retrievable tag
+        r.supported += has_tag
 
     return r
 

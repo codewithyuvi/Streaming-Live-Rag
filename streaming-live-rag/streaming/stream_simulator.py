@@ -1,5 +1,3 @@
-import time
-import random
 from typing import Iterator
 from telemetry.schema import StreamChunk
 
@@ -9,7 +7,6 @@ def simulate_stream(utterance: str, words_per_chunk: int = 3, ms_per_chunk: int 
     """
     words = utterance.split()
     current_text = ""
-    start_time = time.time()
     
     for i in range(0, len(words), words_per_chunk):
         chunk_words = words[i:i+words_per_chunk]

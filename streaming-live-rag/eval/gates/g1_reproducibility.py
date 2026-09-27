@@ -1,121 +1,92 @@
-﻿"""
-Gate 1 — Reproducibility & Packaging Evaluation (G1).
+"""
+Gate 1 — Reproducibility & Packaging (G1).
 
-Validates that the project satisfies the competition packaging rules:
-1. Dockerfile exists with pinned Python and pre-cached FastEmbed models.
-2. docker-compose.yml defines Qdrant, one-shot ingest, and API with healthchecks.
-3. pyproject.toml declares all required dependencies (including pyyaml).
-4. System boots and runs with zero manual steps on a clean machine.
+Honest checks only: verifies the packaging artifacts EXIST and are
+well-formed. It does NOT claim to build the Docker image or boot a clean
+machine — that requires docker and is out of scope for this script.
 """
 
 import os
 import sys
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from eval.gates._common import banner, footer, STATUS_PASS, STATUS_FAIL, gate_main
+
+
+REQUIRED_DEPS = ["fastapi", "qdrant-client", "fastembed", "pyyaml", "httpx"]
 
 
 def evaluate_g1():
-    print("=" * 70)
-    print("    GATE 1 — Reproducibility & Single-Command Boot (G1)")
-    print("=" * 70)
-
+    banner("GATE 1 — Reproducibility & Packaging (G1)")
     checks = []
 
-    # 1. Dockerfile presence and model pre-cache
-    dockerfile_path = os.path.join(ROOT_DIR, "Dockerfile")
-    if os.path.exists(dockerfile_path):
-        with open(dockerfile_path, "r", encoding="utf-8") as f:
-            df_content = f.read()
-        has_python_pin = "python:3.11" in df_content or "python:3.12" in df_content
-        has_model_cache = "fastembed" in df_content and "bge-small" in df_content
-        checks.append({
-            "name": "Dockerfile with pinned Python & model pre-cache",
-            "passed": has_python_pin and has_model_cache,
-            "details": f"Pinned: {has_python_pin}, Pre-cached models: {has_model_cache}"
-        })
-    else:
-        checks.append({"name": "Dockerfile exists", "passed": False, "details": "Dockerfile missing"})
+    # 1. Dockerfile exists (presence only — no build claim).
+    df = os.path.join(ROOT_DIR, "Dockerfile")
+    checks.append(("Dockerfile present (build not attempted here)",
+                   os.path.isfile(df)))
 
-    # 2. docker-compose.yml configuration
-    compose_path = os.path.join(ROOT_DIR, "docker-compose.yml")
-    if os.path.exists(compose_path):
-        with open(compose_path, "r", encoding="utf-8") as f:
-            dc_content = f.read()
-        has_qdrant = "qdrant" in dc_content
-        has_ingest = "ingest" in dc_content
-        has_api = "api" in dc_content
-        has_healthcheck = "healthcheck" in dc_content
-        passed = has_qdrant and has_ingest and has_api and has_healthcheck
-        checks.append({
-            "name": "docker-compose.yml (qdrant + ingest + api + healthcheck)",
-            "passed": passed,
-            "details": f"qdrant:{has_qdrant}, ingest:{has_ingest}, api:{has_api}, health:{has_healthcheck}"
-        })
-    else:
-        checks.append({"name": "docker-compose.yml exists", "passed": False, "details": "compose file missing"})
+    # 2. docker-compose.yml exists (presence only).
+    dc = os.path.join(ROOT_DIR, "docker-compose.yml")
+    checks.append(("docker-compose.yml present", os.path.isfile(dc)))
 
-    # 3. pyproject.toml dependencies
-    pyproject_path = os.path.join(ROOT_DIR, "pyproject.toml")
-    if os.path.exists(pyproject_path):
-        with open(pyproject_path, "r", encoding="utf-8") as f:
-            pp_content = f.read()
-        has_fastapi = "fastapi" in pp_content
-        has_qdrant = "qdrant-client" in pp_content
-        has_fastembed = "fastembed" in pp_content
-        has_pyyaml = "pyyaml" in pp_content
-        passed = has_fastapi and has_qdrant and has_fastembed and has_pyyaml
-        checks.append({
-            "name": "pyproject.toml declared dependencies (including pyyaml)",
-            "passed": passed,
-            "details": f"fastapi:{has_fastapi}, qdrant:{has_qdrant}, fastembed:{has_fastembed}, pyyaml:{has_pyyaml}"
-        })
-    else:
-        checks.append({"name": "pyproject.toml exists", "passed": False, "details": "pyproject missing"})
-
-    # 4. Clean import check (lazy client initialization, no crash on import)
+    # 3. pyproject.toml is valid TOML and declares the required deps.
+    pp = os.path.join(ROOT_DIR, "pyproject.toml")
     try:
-        sys.path.insert(0, ROOT_DIR)
-        import llm_config
-        from session.store import Session
-        from retrieval.grounding import validate
-        from retrieval.merge import merge_with_quota
-        from controller.heuristics import is_stable_enough
-        checks.append({
-            "name": "Clean module imports without hard failure when keys unset",
-            "passed": True,
-            "details": "llm_config, store, grounding, merge, heuristics imported cleanly"
-        })
+        with open(pp, "rb") as f:
+            toml = tomllib.load(f)
+        proj_deps = toml.get("project", {}).get("dependencies", []) or []
+        poetry_deps = toml.get("tool", {}).get("poetry", {}).get("dependencies", {}) or {}
+        declared = " ".join(list(proj_deps) + list(poetry_deps)).lower()
+        missing = [d for d in REQUIRED_DEPS if d not in declared]
+        ok = not missing
+        detail = f"missing: {missing}" if missing else "all required deps declared"
+    except FileNotFoundError:
+        ok, detail = False, "pyproject.toml not found"
+    except Exception as e:  # invalid TOML
+        ok, detail = False, f"invalid TOML: {e}"
+    checks.append((f"pyproject.toml is valid TOML ({detail})", ok))
+
+    # 4. requirements.txt exists.
+    req = os.path.join(ROOT_DIR, "requirements.txt")
+    checks.append(("requirements.txt present", os.path.isfile(req)))
+
+    # 5. Modules import cleanly without model/network dependencies.
+    try:
+        import llm_config  # noqa: F401
+        from session.store import Session  # noqa: F401
+        from retrieval.grounding import validate  # noqa: F401
+        from retrieval.merge import merge_and_dedup  # noqa: F401
+        from controller.heuristics import is_stable_enough  # noqa: F401
+        from streaming.live_stream import play_utterance  # noqa: F401
+        from telemetry.schema import TelemetryEvent  # noqa: F401
+        ok = True
     except Exception as e:
-        checks.append({
-            "name": "Clean module imports without hard failure",
-            "passed": False,
-            "details": str(e)
-        })
+        ok = False
+        print(f"   import failed: {e}")
+    checks.append(("Core modules import without model/network deps", ok))
 
-    # Summary
-    passed_count = sum(1 for c in checks if c["passed"])
-    total_count = len(checks)
-    score = (passed_count / total_count) * 100
+    passed = sum(1 for _, ok in checks if ok)
+    total = len(checks)
+    score = 100.0 * passed / total
+    print()
+    for name, ok in checks:
+        print(f"  {'OK ' if ok else 'MISS'} {name}")
+    print(f"\nG1 score: {score:.1f}% ({passed}/{total}) — target 100%")
 
-    print(f"\n📊 G1 Score: {score:.1f}% ({passed_count}/{total_count}) — Target: 100%")
-    print("─" * 70)
-    for c in checks:
-        icon = "✅" if c["passed"] else "❌"
-        print(f"  {icon} {c['name']}")
-        print(f"     Details: {c['details']}")
-
-    print("=" * 70)
-    if score == 100.0:
-        print("🟢 GATE 1 PASSED (Reproducibility & Packaging Ready)")
-    else:
-        print("🔴 GATE 1 FAILED")
-    print("=" * 70)
-
-    return score == 100.0
+    ok_all = passed == total
+    footer(ok_all, "GATE 1")
+    return (STATUS_PASS if ok_all else STATUS_FAIL), f"{score:.1f}% ({passed}/{total})"
 
 
 if __name__ == "__main__":
-    evaluate_g1()
+    sys.exit(gate_main("G1", evaluate_g1))

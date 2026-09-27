@@ -1,13 +1,32 @@
-# ADR-2: Retrieval backend — Qdrant (self-hosted, one Docker service)
+# ADR-2: Retrieval backend — Qdrant (Self-Hosted Docker with Embedded Local Storage Fallback)
 
-**Decision:** Qdrant, run as a single `docker-compose` service, is the vector database and the sparse/BM25 engine.
+**Status:** Accepted & Enhanced (September 2026)
 
-**Why:** The theme explicitly grades a ”Dense/Sparse Hybrid Scoring” pipeline stage, not just similarity search. Qdrant's Query API supports named dense + sparse vectors on the same collection with **server-side BM25** and single-call fusion (RRF or DBSF) via `prefetch` — meaning the ”hard” part of Component 3 (Corpus Retrieval & Fusion) is a well-tested, already-built primitive rather than code you write and debug under time pressure. This collapses what would otherwise be two systems (a vector index plus a separate BM25 library) into one Docker container, which directly serves both G1 reproducibility and the parsimony rule. General 2026 vector-DB guidance for hackathons often points to FAISS as the default ”just get something working” choice — but that advice assumes dense-only retrieval is enough; here, hybrid fusion quality is itself graded, so the calculus is different.
+**Decision:** Qdrant is the primary vector database and sparse BM25 engine, configured to support both containerized deployments (`docker compose`) and zero-Docker environments via automatic embedded local storage (`data/qdrant_storage`).
 
-**Alternatives considered:** 
-- FAISS + a standalone BM25 library (`bm25s`, actively maintained and dramatically faster than the older `rank_bm25`) — genuinely fine and the recommended **fallback** if Qdrant/Docker networking becomes a blocker; you lose the one-call fusion but gain zero server dependencies. 
-- `pgvector` — solid in general, but adds Postgres operational overhead here for no offsetting benefit, since you don't need relational joins.
+---
 
-**Known sharp edges (from Qdrant's own guidance):** BM25's `avg_len` parameter is *not* computed automatically — calibrate it to your actual chunk length, or short chunks get systematically over/under-scored. Sparse learned alternatives to BM25 (BM42, SPLADE) exist but are English-only, need domain fine-tuning, and in BM42's case are explicitly unmaintained — don't reach for them under time pressure.
+### Why:
+The theme explicitly grades a **Dense/Sparse Hybrid Scoring** pipeline stage, not just similarity search. Qdrant's Query API supports named dense + sparse vectors on the same collection with **server-side BM25** and single-call fusion (Reciprocal Rank Fusion — RRF) via `prefetch`. This collapses what would otherwise be two systems (a vector index plus a separate BM25 library) into one unified system, directly serving Gate G1 reproducibility and the architectural parsimony rule.
 
-**Revisit if:** corpus turns out to be enormous (tens of millions of chunks) or multi-tenant isolation becomes a real requirement — neither is expected here.
+---
+
+### Architectural Enhancement: Dual-Mode Operation
+During testing on varied host operating systems (e.g., Windows without WSL2 or when Docker Desktop is halted), relying solely on a network socket to `localhost:6333` presented an operational single-point-of-failure.
+
+To resolve this without rewriting our hybrid queries, we implemented **transparent auto-fallback** in `retrieval/hybrid_search.py`:
+1. **Primary Mode:** Attempts connection to remote Qdrant at `QDRANT_URL` (default: `http://localhost:6333`).
+2. **Embedded Fallback Mode:** If remote Qdrant is unreachable, `get_qdrant_client()` automatically instantiates an embedded Qdrant instance storing vectors locally on disk at `data/qdrant_storage`.
+3. **Parity:** Both modes expose the identical `QdrantClient` Python API, preserving dense vectors (BGE-Small 384d), sparse vectors (BM25 with `Modifier.IDF`), and RRF fusion without any code branches in retrieval logic.
+
+---
+
+### Alternatives Considered:
+- **FAISS + standalone BM25 (`bm25s`):** Viable fallback, but lacks single-call RRF fusion and requires managing two separate vector/index serialization formats.
+- **pgvector:** Introduces PostgreSQL database administration overhead with no offsetting advantage for a flat-file corpus.
+
+---
+
+### Known Sharp Edges & Mitigations:
+- **BM25 IDF Weighting:** Standard BM25 requires corpus-wide document frequency. FastEmbed's `Qdrant/bm25` model paired with Qdrant's `Modifier.IDF` automatically calculates inverse document frequencies across ingested chunks.
+- **Embedded Concurrency:** On-disk storage acquires a process lock. Handled safely in Uvicorn using asynchronous thread pools (`asyncio.to_thread`) and application startup lifecycle auto-seeding.

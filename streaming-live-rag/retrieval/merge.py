@@ -1,4 +1,4 @@
-﻿"""
+"""
 Phase 4 — Result Merger & Deduplicator with Quota Guarantee (H8 / Appendix B.2).
 Prevents sub-intent starvation by ensuring each sub-query receives guaranteed evidence slots.
 """
@@ -45,29 +45,45 @@ def merge_with_quota(
             chosen[pid]["subs"].append(sq)
             if score > chosen[pid]["score"]:
                 chosen[pid]["score"] = score
+        return pid
 
-    # 1) Every sub-intent is guaranteed min_per_sq evidence
+    # 1) Guaranteed sub-intents receive up to min_per_sq evidence slots
     for r in per_sq:
-        for score, p in r.get("scored_hits", [])[:min_per_sq]:
-            take(r["sub_query"], score, p)
+        if r.get("guaranteed", True):
+            for score, p in r.get("scored_hits", [])[:min_per_sq]:
+                take(r["sub_query"], score, p)
 
-    # 2) Fill remaining budget by score
-    rest = sorted(
-        (
-            (s, r["sub_query"], p)
-            for r in per_sq
-            for s, p in r.get("scored_hits", [])[min_per_sq:]
-        ),
-        key=lambda x: -x[0]
-    )
+    # 1b) Provisional (early-retrieval) entries keep a minimum of 1 slot.
+    # Without this, guaranteed delta quotas can exhaust the top_k budget and
+    # silently drop the very evidence the system rushed to retrieve early.
+    # The slot is *reserved*: prov_first ordering below protects it from the
+    # final budget slice.
+    prov_pids: list = []
+    for r in per_sq:
+        if not r.get("guaranteed", True):
+            for score, p in r.get("scored_hits", [])[:1]:
+                prov_pids.append(take(r["sub_query"], score, p))
+
+    # 2) Fill remaining budget by score (non-guaranteed entries participate from hit 0)
+    rest_items = []
+    for r in per_sq:
+        start_idx = min_per_sq if r.get("guaranteed", True) else 0
+        for s, p in r.get("scored_hits", [])[start_idx:]:
+            rest_items.append((s, r["sub_query"], p))
+
+    rest = sorted(rest_items, key=lambda x: -x[0])
 
     for score, sq, p in rest:
         if len(chosen) >= total_k:
             break
         take(sq, score, p)
 
-    limit = max(total_k, len(per_sq) * min_per_sq) if per_sq else total_k
-    return [chosen[i] for i in order][:limit]
+    # 3) Reserved provisional slots lead the final ordering, then the rest
+    # in insertion order, then cut to budget. Provisional evidence is never
+    # the entry dropped by the [:total_k] slice.
+    prov_first = [pid for pid in dict.fromkeys(prov_pids) if pid in chosen]
+    tail = [pid for pid in order if pid not in prov_first]
+    return [chosen[i] for i in (prov_first + tail)][:total_k]
 
 
 def merge_and_dedup(

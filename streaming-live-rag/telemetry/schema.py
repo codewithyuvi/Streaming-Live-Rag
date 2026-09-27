@@ -1,30 +1,4 @@
-try:
-    from pydantic import BaseModel, Field
-except ImportError:
-    class BaseModel:
-        def __init__(self, **kwargs):
-            for k, v in kwargs.items():
-                setattr(self, k, v)
-
-        def model_dump(self):
-            def _to_dict(obj):
-                if isinstance(obj, BaseModel):
-                    return {k: _to_dict(v) for k, v in obj.__dict__.items()}
-                elif isinstance(obj, list):
-                    return [_to_dict(x) for x in obj]
-                elif isinstance(obj, dict):
-                    return {k: _to_dict(v) for k, v in obj.items()}
-                return obj
-            return _to_dict(self)
-
-        def model_dump_json(self):
-            import json
-            return json.dumps(self.model_dump(), default=str)
-
-    def Field(default=None, default_factory=None, **kwargs):
-        if default_factory is not None:
-            return default_factory()
-        return default
+from pydantic import BaseModel, Field
 
 from typing import List, Optional
 
@@ -57,11 +31,19 @@ class LatenciesMs(BaseModel):
     grounding: float = 0.0
     time_to_first_token: float = 0.0
     end_to_end: float = 0.0
+    # Spec aliases from ARCHITECTURE_BRIEF §3 (kept optional for back-compat)
+    controller: float = 0.0
+    synthesis: float = 0.0
+    retrieval_pipeline: float = 0.0
 
 class TokenCost(BaseModel):
     input: int = 0
     output: int = 0
     usd_estimate: float = 0.0
+    # Spec aliases from ARCHITECTURE_BRIEF §3
+    fast_llm_tokens: int = 0
+    synthesis_input_tokens: int = 0
+    synthesis_output_tokens: int = 0
 
 class TelemetryEvent(BaseModel):
     session_id: str
@@ -82,3 +64,11 @@ class TelemetryEvent(BaseModel):
     degraded: bool = False
     latencies_ms: LatenciesMs = Field(default_factory=LatenciesMs)
     token_cost: TokenCost = Field(default_factory=TokenCost)
+    # Honest streaming anchors (wall-clock seconds since stream start).
+    # utterance_end_s: when the user finished speaking; provisional_fired_s:
+    # when the provisional retrieval task was actually created (None if never).
+    # G2 "retrieval commenced prior to final transcript completion" is
+    # provisional_fired_s < utterance_end_s — both measured, never arithmetic.
+    utterance_end_s: float = 0.0
+    provisional_fired_s: Optional[float] = None
+    thought_process: str = ""

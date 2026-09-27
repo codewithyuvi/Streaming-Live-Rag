@@ -25,9 +25,9 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 try:
-    from llm_config import call_fast, FAST_LLM_MODEL
+    from llm_config import call_fast
 except ImportError:
-    from ..llm_config import call_fast, FAST_LLM_MODEL
+    from ..llm_config import call_fast
 
 
 def classify_refinement(
@@ -45,18 +45,24 @@ def classify_refinement(
     """
     u_lower = current_utterance.strip().lower()
     
-    # Fast path: If no conversation history, check for greetings/chit-chat vs new question
+    # Check if it's a greeting, pleasantry, or conversational acknowledgment (always PRESENTATION_ONLY regardless of history)
+    conversational_words = {
+        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+        "how are you", "thanks", "thank you", "thank you so much", "ok", "ok got it",
+        "got it", "understood", "perfect", "great", "awesome", "alright", "i see",
+        "moving on", "ok ok moving on", "great thanks for the info", "perfect thats what i needed",
+        "hmm let me think about that"
+    }
+    cleaned = re.sub(r"[^\w\s]", "", u_lower).strip()
+    if cleaned in conversational_words or any(cleaned.startswith(g) for g in ["hello", "hi ", "hey ", "thanks", "thank you", "ok ", "ok,"]):
+        return {
+            "type": "PRESENTATION_ONLY",
+            "reason": "Conversational pleasantry or acknowledgment",
+            "constraint": ""
+        }
+
+    # Fast path: If no conversation history, substantive utterance must be a NEW_TOPIC
     if not conversation_history.strip() and not previous_answer.strip():
-        # Check if it's a greeting/pleasantry
-        greeting_words = {"hello", "hi", "hey", "good morning", "good afternoon", "good evening", "how are you", "thanks", "thank you"}
-        cleaned = re.sub(r"[^\w\s]", "", u_lower)
-        if cleaned in greeting_words or any(cleaned.startswith(g) for g in ["hello", "hi ", "hey "]):
-            return {
-                "type": "PRESENTATION_ONLY",
-                "reason": "Initial greeting / conversational opener",
-                "constraint": ""
-            }
-        # If no history and not a greeting, it must be a NEW_TOPIC
         return {
             "type": "NEW_TOPIC",
             "reason": "First substantive question in conversation",
@@ -110,7 +116,7 @@ Current Utterance:
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
-            max_tokens=200,
+            max_tokens=500,
         )
     except Exception as e:
         return {"type": "NEW_TOPIC", "reason": f"Fallback due to API error: {str(e)}", "constraint": "", "degraded": True}
