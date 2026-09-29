@@ -61,6 +61,45 @@ else:  # Python 3.10 fallback
         except asyncio.CancelledError:
             raise asyncio.TimeoutError from None
 
+import threading as _threading
+
+_QUERY_CACHE: dict[str, dict] = {}
+_QUERY_CACHE_LOCK = _threading.Lock()
+
+
+def _norm_query(q: str) -> str:
+    return " ".join(re.sub(r"[^\w\s]", " ", (q or "").lower()).split())
+
+
+def get_cached_response(query: str) -> dict | None:
+    norm = _norm_query(query)
+    if not norm or len(norm) < 4:
+        return None
+    with _QUERY_CACHE_LOCK:
+        item = _QUERY_CACHE.get(norm)
+        if item:
+            return dict(item)
+    return None
+
+
+def set_cached_response(query: str, answer: str, citations: list[str], sub_queries: list[str], grounding_score: float = 1.0) -> None:
+    norm = _norm_query(query)
+    if not norm or len(norm) < 4 or not answer or "not available in the provided documents" in answer:
+        return
+    with _QUERY_CACHE_LOCK:
+        _QUERY_CACHE[norm] = {
+            "answer": answer,
+            "citations": list(citations),
+            "sub_queries": list(sub_queries),
+            "grounding_score": grounding_score,
+            "timestamp": time.time(),
+        }
+
+
+def clear_query_cache() -> None:
+    with _QUERY_CACHE_LOCK:
+        _QUERY_CACHE.clear()
+
 
 # ---------------------------------------------------------------------------
 # Helpers (moved from api/main.py; re-exported there for back-compat)
@@ -95,6 +134,52 @@ def _same_intent(q1: str, q2: str | None) -> bool:
     jaccard = inter / union if union else 0.0
     subquery_recall = inter / len(t1) if t1 else 0.0
     return jaccard >= 0.6 and subquery_recall >= 0.8
+
+
+def extract_topic(text: str) -> str:
+    """Extract core subject/topic from an initial query prefix."""
+    t = text.strip()
+    t = re.sub(
+        r"^(?:what\s+(?:is|are|was|were)|how\s+(?:does|do|can|is)|why\s+(?:is|are|does)|"
+        r"tell\s+me\s+about|explain|can\s+you\s+explain|i\s+need\s+to\s+know\s+about|"
+        r"i\s+need\s+to\s+plan\s+a|i\s+need)\s+",
+        "", t, flags=re.IGNORECASE,
+    )
+    t = re.sub(r"\s+(?:explain|please)$", "", t, flags=re.IGNORECASE)
+    return t.strip() or text.strip()
+
+
+def _contextualize_clause(primary_topic: str, clause: str) -> str:
+    """Contextualize a continuation clause with the primary topic if needed."""
+    if not primary_topic:
+        return clause
+    clause_lower = clause.lower()
+    pronouns = {"it", "its", "they", "them", "their", "this", "these", "that"}
+    words = set(re.findall(r"[a-z0-9]+", clause_lower))
+    has_pronoun = bool(words & pronouns)
+    topic_toks = set(re.findall(r"[a-z0-9]+", primary_topic.lower()))
+    has_topic = bool(topic_toks & words)
+    if primary_topic and (has_pronoun or not has_topic):
+        return f"{primary_topic}: {clause}"
+    return clause
+
+
+def split_intent_clauses(text: str) -> list[str]:
+    """Split a compound utterance or candidate into distinct intent clauses."""
+    delimiters = (
+        r"(?:;\s*|\?\s*|"
+        r"(?<=\w)\s*,\s*(?=(?:and\s+|second\b|third\b|how\b|why\b|what\b))|"
+        r"(?<=\w)\s+(?=(?:second(?:ly)?|third(?:ly)?|and\s+why|and\s+how|and\s+what(?:\s+happens)?|"
+        r"and\s+which|and\s+where|also\s+explain|as\s+well\s+as\s+why|as\s+well\s+as\s+how|"
+        r"how\s+does\s+it|how\s+it\s+divides)\b))"
+    )
+    raw_clauses = re.split(delimiters, text, flags=re.IGNORECASE)
+    clauses = []
+    for c in raw_clauses:
+        cleaned = c.strip(" ,;?")
+        if len(cleaned.split()) >= 3:
+            clauses.append(cleaned)
+    return clauses if len(clauses) > 1 else [text]
 
 
 def _conversational_reply(utterance: str, synthesize_fn: Callable[[str], dict]) -> str:
@@ -183,6 +268,8 @@ async def run_live_turn(
     deps: EngineDeps | None = None,
     emit_event: EventCallback | None = None,
     sink: Callable[[TelemetryEvent], Any] | None = None,
+    live_mode: bool = True,
+    use_cache: bool | None = None,
 ) -> TurnResult:
     """
     Run one conversational turn over a live chunk source.
@@ -196,6 +283,8 @@ async def run_live_turn(
     Returns TurnResult(answer, telemetry). When emit_event is provided, every
     pipeline event is pushed to it in real time (drives the WebSocket UI).
     """
+    is_custom_deps = deps is not None
+    enable_cache = (not is_custom_deps) if use_cache is None else bool(use_cache)
     deps = deps or EngineDeps.defaults()
     sink = sink or _emit_telemetry
 
@@ -240,9 +329,15 @@ async def run_live_turn(
     retrieval_events: list[RetrievalEvent] = []
     thought_texts: list[str] = []
     degraded = False
-    provisional: tuple | None = None  # (query_text, asyncio.Task, t_fire_s)
+    speculative_searches: list[dict] = []
+    provisional: tuple | None = None  # (query_text, asyncio.Task, t_fire_s) for back-compat
     controller_calls = 0
     last_word_count = 0
+    last_evaluated_tail_len = 0
+    last_triggered_word_pos = 0
+    primary_topic = ""
+    max_speculative_searches = 4
+    max_controller_calls = 12
     controller_decision_latency = 0.0
     utterance_end_s: float | None = None
     full_text = ""
@@ -266,56 +361,169 @@ async def run_live_turn(
         partial = ev.text
         await _ev({"type": "transcript", "t_s": t_s, "partial_text": partial})
 
-        candidate = get_stable_query_prefix(partial)
-        if not candidate:
-            continue
-        words = len(candidate.split())
-        if (words - last_word_count) < 2 or controller_calls >= 3:
-            continue
-        if provisional is not None:
-            # Early retrieval already in flight; keep listening to speech.
+        if not live_mode:
+            # Standard sequential RAG mode: buffer transcript without speculative pre-retrieval
             continue
 
-        t_dec_0 = time.perf_counter()
-        try:
-            d = await asyncio.wait_for(
-                asyncio.to_thread(deps.decide_fn, candidate), timeout=10.0)
-        except (asyncio.TimeoutError, TimeoutError):
-            logger.warning("decide timed out for %r; falling back to wait", candidate)
-            d = {"trigger": "wait", "reason": "timeout_degraded", "degraded": True}
-        controller_decision_latency += (time.perf_counter() - t_dec_0) * 1000
-        controller_calls += 1
-        last_word_count = words
-        if d.get("degraded"):
-            degraded = True
+        if len(speculative_searches) == 0:
+            candidate = get_stable_query_prefix(partial)
+            if not candidate:
+                continue
+            words = len(candidate.split())
+            if (words - last_word_count) < 2 or controller_calls >= max_controller_calls:
+                continue
 
-        record = ControllerDecision(trigger=d["trigger"], timestamp_s=t_s,
-                                    reason=d.get("reason", ""))
-        decisions.append(record)
-        await _ev({"type": "controller", "t_s": t_s, "trigger": d["trigger"],
-                   "reason": d.get("reason", ""), "query": candidate})
+            t_dec_0 = time.perf_counter()
+            try:
+                d = await asyncio.wait_for(
+                    asyncio.to_thread(deps.decide_fn, candidate), timeout=10.0)
+            except (asyncio.TimeoutError, TimeoutError):
+                logger.warning("decide timed out for %r; falling back to wait", candidate)
+                d = {"trigger": "wait", "reason": "timeout_degraded", "degraded": True}
+            controller_decision_latency += (time.perf_counter() - t_dec_0) * 1000
+            controller_calls += 1
+            last_word_count = words
+            if d.get("degraded"):
+                degraded = True
 
-        if d["trigger"] == "retrieve_now":
-            # Provisional retrieval: fired while the user is still speaking.
-            # t_fire is the REAL wall-clock moment the task was created.
-            prov_task = asyncio.create_task(
-                asyncio.to_thread(deps.retrieve_fn, partial, partial, 5))
-            provisional = (partial, prov_task, t_s)
-            provisional_fired_s = t_s
-            retrieval_events.append(RetrievalEvent(
-                timestamp_s=t_s, query=partial, trigger="provisional"))
-            await _ev({"type": "retrieval_started", "t_s": t_s,
-                       "trigger": "provisional", "query": partial})
-            p1_text = (
-                f"Phase 1 (stream analysis & early trigger): Actionable query prefix \"{candidate}\" "
-                f"detected at t = {t_s:.2f}s in partial transcript \"{partial}\". Fired provisional retrieval "
-                f"while speaker is still talking."
-            )
-            thought_texts.append(p1_text)
-            await _ev({"type": "thought", "t_s": t_s, "phase": 1, "text": p1_text})
-        # "wait" and "no_retrieval_needed" need no action mid-stream; the
-        # end-of-utterance pipeline (refinement classification) decides the
-        # final handling once the complete utterance is known.
+            record = ControllerDecision(trigger=d["trigger"], timestamp_s=t_s,
+                                        reason=d.get("reason", ""))
+            decisions.append(record)
+            await _ev({"type": "controller", "t_s": t_s, "trigger": d["trigger"],
+                       "reason": d.get("reason", ""), "query": candidate, "intent_index": 1})
+
+            if d["trigger"] == "retrieve_now":
+                # Provisional retrieval: fired while the user is still speaking.
+                # t_fire is the REAL wall-clock moment the task was created.
+                clauses = split_intent_clauses(candidate)
+                primary_topic = extract_topic(clauses[0] if clauses else candidate)
+
+                clause_1 = clauses[0] if clauses else candidate
+                prov_query = clause_1 if len(clauses) > 1 else partial
+                prov_task = asyncio.create_task(
+                    asyncio.to_thread(deps.retrieve_fn, prov_query, clause_1, 5))
+                provisional = (prov_query, prov_task, t_s)
+                provisional_fired_s = t_s
+                speculative_searches.append({
+                    "query": prov_query, "clause": candidate, "task": prov_task,
+                    "t_s": t_s, "intent_index": 1,
+                })
+                retrieval_events.append(RetrievalEvent(
+                    timestamp_s=t_s, query=prov_query, trigger="provisional"))
+                await _ev({"type": "retrieval_started", "t_s": t_s,
+                           "trigger": "provisional", "query": prov_query, "intent_index": 1})
+                p1_text = (
+                    f"Phase 1 (stream analysis & early trigger): Actionable query prefix \"{candidate}\" "
+                    f"detected at t = {t_s:.2f}s in partial transcript \"{partial}\". Fired provisional retrieval "
+                    f"while speaker is still talking."
+                )
+                thought_texts.append(p1_text)
+                await _ev({"type": "thought", "t_s": t_s, "phase": 1, "text": p1_text})
+                last_triggered_word_pos = len(partial.split())
+
+                if len(clauses) > 1:
+                    for sub_clause in clauses[1:]:
+                        if len(speculative_searches) >= max_speculative_searches:
+                            break
+                        if any(_same_intent(sub_clause, s["clause"]) or _same_intent(sub_clause, s["query"]) for s in speculative_searches):
+                            continue
+                        try:
+                            sub_d = await asyncio.wait_for(
+                                asyncio.to_thread(deps.decide_fn, sub_clause), timeout=10.0)
+                        except Exception:
+                            sub_d = {"trigger": "retrieve_now", "reason": "multi_clause"}
+                        if sub_d.get("trigger") == "retrieve_now":
+                            next_idx = len(speculative_searches) + 1
+                            sub_search_q = _contextualize_clause(primary_topic, sub_clause)
+                            sub_task = asyncio.create_task(
+                                asyncio.to_thread(deps.retrieve_fn, sub_search_q, sub_clause, 5))
+                            speculative_searches.append({
+                                "query": sub_search_q, "clause": sub_clause, "task": sub_task,
+                                "t_s": t_s, "intent_index": next_idx,
+                            })
+                            retrieval_events.append(RetrievalEvent(
+                                timestamp_s=t_s, query=sub_search_q, trigger="provisional"))
+                            await _ev({"type": "retrieval_started", "t_s": t_s,
+                                       "trigger": "provisional", "query": sub_search_q, "intent_index": next_idx})
+                            p_sub_text = (
+                                f"Phase 1 (stream analysis & early trigger): Actionable query entity #{next_idx} "
+                                f"\"{sub_clause}\" detected at t = {t_s:.2f}s. Fired simultaneous "
+                                f"speculative search #{next_idx} in background while speaker is still talking."
+                            )
+                            thought_texts.append(p_sub_text)
+                            await _ev({"type": "thought", "t_s": t_s, "phase": 1, "text": p_sub_text})
+        elif len(speculative_searches) < max_speculative_searches:
+            # Continuous simultaneous multi-intent retrieval:
+            # As speaker continues talking, check if subsequent clauses contain distinct intents.
+            partial_words = partial.split()
+            new_words = partial_words[last_triggered_word_pos:]
+            if len(new_words) < 4:
+                continue
+
+            continuation = " ".join(new_words)
+            continuation_clean = re.sub(
+                r"^(?:and|also|plus|then|as well as|while|whereas|but)\s+",
+                "", continuation, flags=re.IGNORECASE).strip()
+            if len(continuation_clean.split()) < 3:
+                continue
+
+            tail_candidate = get_stable_query_prefix(continuation_clean)
+            if not tail_candidate:
+                continue
+
+            tail_words_len = len(tail_candidate.split())
+            if (tail_words_len - last_evaluated_tail_len) < 2 or controller_calls >= max_controller_calls:
+                continue
+
+            t_dec_0 = time.perf_counter()
+            try:
+                d = await asyncio.wait_for(
+                    asyncio.to_thread(deps.decide_fn, tail_candidate), timeout=10.0)
+            except (asyncio.TimeoutError, TimeoutError):
+                logger.warning("decide timed out for tail %r; falling back to wait", tail_candidate)
+                d = {"trigger": "wait", "reason": "timeout_degraded", "degraded": True}
+            controller_decision_latency += (time.perf_counter() - t_dec_0) * 1000
+            controller_calls += 1
+            last_evaluated_tail_len = tail_words_len
+            if d.get("degraded"):
+                degraded = True
+
+            next_intent_idx = len(speculative_searches) + 1
+            record = ControllerDecision(trigger=d["trigger"], timestamp_s=t_s,
+                                        reason=d.get("reason", ""))
+            decisions.append(record)
+            await _ev({"type": "controller", "t_s": t_s, "trigger": d["trigger"],
+                       "reason": d.get("reason", ""), "query": tail_candidate,
+                       "intent_index": next_intent_idx})
+
+            if d["trigger"] == "retrieve_now":
+                is_dup = any(
+                    _same_intent(tail_candidate, s["clause"]) or
+                    _same_intent(tail_candidate, s["query"])
+                    for s in speculative_searches
+                )
+                if not is_dup:
+                    search_query = _contextualize_clause(primary_topic, tail_candidate)
+                    spec_task = asyncio.create_task(
+                        asyncio.to_thread(deps.retrieve_fn, search_query, tail_candidate, 5))
+                    speculative_searches.append({
+                        "query": search_query, "clause": tail_candidate, "task": spec_task,
+                        "t_s": t_s, "intent_index": next_intent_idx,
+                    })
+                    retrieval_events.append(RetrievalEvent(
+                        timestamp_s=t_s, query=search_query, trigger="provisional"))
+                    await _ev({"type": "retrieval_started", "t_s": t_s,
+                               "trigger": "provisional", "query": search_query,
+                               "intent_index": next_intent_idx})
+                    p1_text = (
+                        f"Phase 1 (stream analysis & early trigger): Actionable query entity #{next_intent_idx} "
+                        f"\"{tail_candidate}\" detected at t = {t_s:.2f}s in continuation. Fired simultaneous "
+                        f"speculative search #{next_intent_idx} in background while speaker is still talking."
+                    )
+                    thought_texts.append(p1_text)
+                    await _ev({"type": "thought", "t_s": t_s, "phase": 1, "text": p1_text})
+                    last_triggered_word_pos = len(partial_words)
+                    last_evaluated_tail_len = 0
 
     if utterance_end_s is None:
         # Source ended without an explicit end event (e.g. client disconnect).
@@ -323,6 +531,58 @@ async def run_live_turn(
         await _ev({"type": "utterance_end", "t_s": utterance_end_s, "full_text": full_text})
 
     utterance = full_text
+
+    # ── Fast Exact/Normalized Query Cache Check ────────────────────────
+    cached_entry = get_cached_response(utterance) if enable_cache else None
+    is_repeat_query = bool(has_history and _norm_query(utterance) == _norm_query(current_query_snapshot))
+    if cached_entry and (not has_history or is_repeat_query):
+        cached_ans = cached_entry["answer"]
+        cached_cites = cached_entry["citations"]
+        cached_subs = cached_entry["sub_queries"]
+        answer_version, server_turn_id = _commit_locked(
+            "NEW_TOPIC", utterance, cached_ans, cached_cites, effective_query=utterance, sub_queries=cached_subs
+        )
+        p0_text = (
+            f"Phase 0 (⚡ Instant Query Cache Hit): Identical query detected in fast memory cache. "
+            f"Serving verified 100% grounded response instantly without redundant vector search or LLM latency."
+        )
+        thought_texts.append(p0_text)
+        await _ev({"type": "thought", "t_s": round(time.monotonic() - t0, 3), "phase": 0, "text": p0_text})
+
+        telemetry = TelemetryEvent(
+            session_id=session_id, turn_id=server_turn_id,
+            controller_decisions=[],
+            refinement_type="NEW_TOPIC", retrieval_required=True,
+            retrieval_events=[], sub_queries=cached_subs,
+            answer=cached_ans, citations=cached_cites,
+            uncertainty="", grounding_score=1.0,
+            answer_version=answer_version, degraded=False,
+            utterance_end_s=utterance_end_s or round(time.monotonic() - t0, 3),
+            provisional_fired_s=None,
+            latencies_ms=LatenciesMs(
+                retrieval=0.0, decompose=0.0, refinement=0.0, controller=0.0,
+                end_to_end=round((time.time() - wall_start) * 1000, 2)
+            ),
+            thought_process=p0_text,
+        )
+        try:
+            sink(telemetry)
+        except Exception:
+            pass
+        await _ev({"type": "answer", "t_s": round(time.monotonic() - t0, 3),
+                   "answer": cached_ans, "citations": cached_cites,
+                   "uncertainty": "", "grounding_score": 1.0,
+                   "answer_version": answer_version, "sub_queries": cached_subs})
+        await _ev({"type": "telemetry", "telemetry": telemetry.model_dump()})
+        return TurnResult(answer=cached_ans, telemetry=telemetry)
+
+    if not live_mode:
+        p_seq = (
+            f"Phase 1 (Standard Sequential RAG): Utterance \"{utterance}\" captured at t = {utterance_end_s:.2f}s. "
+            f"Live speculative pre-retrieval is disabled; executing standard sequential RAG pipeline."
+        )
+        thought_texts.append(p_seq)
+        await _ev({"type": "thought", "t_s": utterance_end_s, "phase": 1, "text": p_seq})
 
     # Capture the provisional retrieval's in-flight state at the exact moment
     # the utterance ended. Phase 2 narrates this as evidence that the stream
@@ -362,9 +622,13 @@ async def run_live_turn(
 
     # ── PRESENTATION_ONLY ──────────────────────────────────────────────────
     if refinement_type == "PRESENTATION_ONLY":
-        # Suppression must not issue new retrieval: cancel any provisional
-        # task that fired mid-stream before we knew this was a reformat.
-        if provisional is not None and not provisional[1].done():
+        # Suppression must not issue new retrieval: cancel any speculative
+        # tasks that fired mid-stream before we knew this was a reformat.
+        if speculative_searches:
+            for s in speculative_searches:
+                if not s["task"].done():
+                    s["task"].cancel()
+        elif provisional is not None and not provisional[1].done():
             provisional[1].cancel()
         if current_answer_snapshot:
             with session_lock:
@@ -415,6 +679,60 @@ async def run_live_turn(
         await _ev({"type": "telemetry", "telemetry": telemetry.model_dump()})
         return TurnResult(answer=answer_text, telemetry=telemetry)
 
+    # ── Fast Cache Check for NEW_TOPIC with prior history ─────────────────
+    if enable_cache and refinement_type == "NEW_TOPIC":
+        cached_entry = get_cached_response(utterance)
+        if cached_entry:
+            if speculative_searches:
+                for s in speculative_searches:
+                    if not s["task"].done():
+                        s["task"].cancel()
+            elif provisional is not None and not provisional[1].done():
+                provisional[1].cancel()
+
+            cached_ans = cached_entry["answer"]
+            cached_cites = cached_entry["citations"]
+            cached_subs = cached_entry["sub_queries"]
+            answer_version, server_turn_id = _commit_locked(
+                "NEW_TOPIC", utterance, cached_ans, cached_cites, effective_query=utterance, sub_queries=cached_subs
+            )
+            p0_text = (
+                f"Phase 0 (⚡ Instant Query Cache Hit): Verified response retrieved from fast memory cache. "
+                f"Serving 100% grounded response without redundant vector search or synthesis."
+            )
+            thought_texts.append(p0_text)
+            await _ev({"type": "thought", "t_s": round(time.monotonic() - t0, 3), "phase": 0, "text": p0_text})
+
+            telemetry = TelemetryEvent(
+                session_id=session_id, turn_id=server_turn_id,
+                controller_decisions=decisions,
+                controller_decision=decisions[-1] if decisions else None,
+                refinement_type="NEW_TOPIC", retrieval_required=True,
+                retrieval_events=retrieval_events, sub_queries=cached_subs,
+                answer=cached_ans, citations=cached_cites,
+                uncertainty="", grounding_score=1.0,
+                answer_version=answer_version, degraded=False,
+                utterance_end_s=utterance_end_s or round(time.monotonic() - t0, 3),
+                provisional_fired_s=provisional_fired_s,
+                latencies_ms=LatenciesMs(
+                    retrieval=0.0, decompose=0.0,
+                    refinement=round(refinement_latency, 2),
+                    controller=round(refinement_latency, 2),
+                    end_to_end=round((time.time() - wall_start) * 1000, 2)
+                ),
+                thought_process="\n\n".join(thought_texts),
+            )
+            try:
+                sink(telemetry)
+            except Exception:
+                pass
+            await _ev({"type": "answer", "t_s": round(time.monotonic() - t0, 3),
+                       "answer": cached_ans, "citations": cached_cites,
+                       "uncertainty": "", "grounding_score": 1.0,
+                       "answer_version": answer_version, "sub_queries": cached_subs})
+            await _ev({"type": "telemetry", "telemetry": telemetry.model_dump()})
+            return TurnResult(answer=cached_ans, telemetry=telemetry)
+
     # ── Decomposition ─────────────────────────────────────────────────────
     await _ev({"type": "status", "t_s": round(time.monotonic() - t0, 3),
                "stage": "decomposing"})
@@ -443,7 +761,11 @@ async def run_live_turn(
         logger.warning("decomposer returned no sub-queries; using conversational fallback")
         answer_text = await asyncio.to_thread(
             _conversational_reply, utterance, deps.synthesize_fn)
-        if provisional is not None:
+        if speculative_searches:
+            for s in speculative_searches:
+                if not s["task"].done():
+                    s["task"].cancel()
+        elif provisional is not None:
             provisional[1].cancel()
         answer_version, server_turn_id = _commit_locked(
             "PRESENTATION_ONLY", utterance, answer_text, [])
@@ -489,14 +811,29 @@ async def run_live_turn(
         else:
             continuation = utterance
         in_flight_str = "still in flight" if _prov_in_flight_at_end else "already complete"
-        p2_text = (
-            f"Phase 2 (utterance end & continuation ingestion): Speech concluded at t = {utterance_end_s:.2f}s. "
-            f"New words since the provisional trigger at t = {provisional_fired_s:.2f}s: \"{continuation}\". "
-            f"The provisional retrieval for \"{_prov_partial}\" (fired at t = {provisional_fired_s:.2f}s) was "
-            f"{in_flight_str} when the utterance ended — not aborted, context not reset. Folding the new clause "
-            f"in as an additional intent and dispatching its retrieval in parallel. "
-            f"Produced {len(sub_query_texts)} sub-queries:\n{sub_q_list}"
-        )
+        if len(speculative_searches) > 1:
+            spec_summary = ", ".join(
+                f"Intent {s['intent_index']} (\"{s['clause']}\" at t = {s['t_s']:.2f}s)"
+                for s in speculative_searches
+            )
+            p2_text = (
+                f"Phase 2 (utterance end & continuation ingestion): Speech concluded at t = {utterance_end_s:.2f}s. "
+                f"New words since the provisional trigger at t = {provisional_fired_s:.2f}s: \"{continuation}\". "
+                f"{len(speculative_searches)} simultaneous speculative searches were executed during speech: {spec_summary}. "
+                f"The provisional retrieval for \"{_prov_partial}\" (fired at t = {provisional_fired_s:.2f}s) was "
+                f"{in_flight_str} when the utterance ended — not aborted, context not reset. Folding the new clause "
+                f"in as an additional intent and dispatching its retrieval in parallel. "
+                f"Produced {len(sub_query_texts)} sub-queries:\n{sub_q_list}"
+            )
+        else:
+            p2_text = (
+                f"Phase 2 (utterance end & continuation ingestion): Speech concluded at t = {utterance_end_s:.2f}s. "
+                f"New words since the provisional trigger at t = {provisional_fired_s:.2f}s: \"{continuation}\". "
+                f"The provisional retrieval for \"{_prov_partial}\" (fired at t = {provisional_fired_s:.2f}s) was "
+                f"{in_flight_str} when the utterance ended — not aborted, context not reset. Folding the new clause "
+                f"in as an additional intent and dispatching its retrieval in parallel. "
+                f"Produced {len(sub_query_texts)} sub-queries:\n{sub_q_list}"
+            )
     else:
         p2_text = (
             f"Phase 2 (utterance end & continuation ingestion): Speech concluded at t = {utterance_end_s:.2f}s. "
@@ -507,11 +844,46 @@ async def run_live_turn(
     thought_texts.append(p2_text)
     await _ev({"type": "thought", "t_s": p2_t_s, "phase": 2, "text": p2_text})
 
-    # Delta: sub-queries not already covered by the provisional retrieval.
-    todo = [q for q in sub_query_texts
-            if not _same_intent(q, provisional[0] if provisional else None)]
+    # Delta: sub-queries not already covered by speculative retrievals.
+    def _is_covered(sub_q: str) -> bool:
+        for s in speculative_searches:
+            if _same_intent(sub_q, s["query"]) or _same_intent(sub_q, s.get("clause")):
+                return True
+        if provisional:
+            if _same_intent(sub_q, provisional[0]):
+                return True
 
-    # ── Retrieval (delta fan-out + await provisional) ──────────────────────
+        # Collective coverage: if the speculative searches executed during speech
+        # collectively cover the core concepts of sub_q, avoid redundant delta search!
+        if speculative_searches:
+            sub_toks = set(re.findall(r"[a-z0-9]+", sub_q.lower()))
+            stops = {
+                "what", "is", "are", "was", "were", "how", "why", "the", "a", "an",
+                "of", "to", "in", "on", "and", "or", "does", "do", "it", "said",
+                "explain", "instead", "rather", "than", "while", "not", "with"
+            }
+            meaningful_sub_toks = sub_toks - stops
+            if meaningful_sub_toks:
+                all_spec_toks = set()
+                for s in speculative_searches:
+                    all_spec_toks.update(re.findall(r"[a-z0-9]+", s["query"].lower()))
+                    if s.get("clause"):
+                        all_spec_toks.update(re.findall(r"[a-z0-9]+", s["clause"].lower()))
+                def _stem(w: str) -> str:
+                    return w.rstrip("s").rstrip("ing").rstrip("ed")
+                spec_stems = {_stem(w) for w in all_spec_toks}
+                matched = 0
+                for tok in meaningful_sub_toks:
+                    if tok in all_spec_toks or _stem(tok) in spec_stems:
+                        matched += 1
+                coverage = matched / len(meaningful_sub_toks)
+                if coverage >= 0.70:
+                    return True
+        return False
+
+    todo = [q for q in sub_query_texts if not _is_covered(q)]
+
+    # ── Retrieval (delta fan-out + await provisional & speculative) ────────
     await _ev({"type": "status", "t_s": round(time.monotonic() - t0, 3),
                "stage": "retrieving"})
     retrieval_start = time.time()
@@ -533,7 +905,18 @@ async def run_live_turn(
                                "trigger": "multi_intent" if len(sub_query_texts) > 1 else "delta",
                                "query": q_text,
                                "hits": len(res) if not isinstance(res, BaseException) else 0})
-            if provisional is not None:
+            if speculative_searches:
+                for s in speculative_searches:
+                    try:
+                        s_hits = await s["task"]
+                        s["hits"] = s_hits
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as e:
+                        retrieval_error = str(e)
+                        s["hits"] = []
+                prov_hits = speculative_searches[0].get("hits", [])
+            elif provisional is not None:
                 try:
                     prov_hits = await provisional[1]
                 except asyncio.CancelledError:
@@ -542,6 +925,9 @@ async def run_live_turn(
                     retrieval_error = str(e)
                     prov_hits = []
     except (asyncio.TimeoutError, asyncio.CancelledError):
+        for s in speculative_searches:
+            if not s["task"].done():
+                s["task"].cancel()
         if provisional is not None and not provisional[1].done():
             provisional[1].cancel()
         raise
@@ -551,7 +937,12 @@ async def run_live_turn(
     retrieval_latency = (time.time() - retrieval_start) * 1000
 
     per_subquery_results = []
-    if provisional:
+    if speculative_searches:
+        for s in speculative_searches:
+            per_subquery_results.append({
+                "sub_query": s["query"], "scored_hits": s.get("hits", []), "guaranteed": False,
+            })
+    elif provisional:
         per_subquery_results.append({
             "sub_query": provisional[0], "scored_hits": prov_hits, "guaranteed": False,
         })
@@ -768,6 +1159,9 @@ Provide a clear, well-cited answer.
         kind=refinement_type, utterance=utterance, answer=answer_text,
         cited=final_citations, effective_query=effective_query,
         sub_queries=sub_query_texts)
+
+    if enable_cache and report.ok and not report.abstained and refinement_type == "NEW_TOPIC":
+        set_cached_response(utterance, answer_text, final_citations, sub_query_texts, grounding_score=report.score)
 
     total_latency = (time.time() - wall_start) * 1000
     telemetry = TelemetryEvent(

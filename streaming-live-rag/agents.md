@@ -227,6 +227,60 @@ Phase 3 (Streaming Controller) completed and Gate 2 cleared.
   - Stage and commit updated documentation to git `origin/main`.
   - Tag release with `PRISM_GENAI_HACKATHON_Y2026`.
 
+### [2026-09-27] Fixed Docker Bridge Admin Access & UI Admin Token Support
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - Resolved `403 Forbidden` on `/corpus/upload` and admin routes when running under Docker Compose.
+  - Implemented `_is_loopback_or_docker(client_host)` in `api/main.py` allowing Docker host gateway traffic (`172.16.0.0/12`, `192.168.0.0/16`, `10.0.0.0/8`, `127.0.0.1`) when `ADMIN_TOKEN` is unset.
+  - Added `ADMIN_TOKEN=${ADMIN_TOKEN:-}` forwarding in `docker-compose.yml`.
+  - Added `getAdminHeaders()` and interactive token prompt fallback in `static/index.html` across upload, reseed, and BYOK modal.
+  - Rebuilt and verified running Docker Compose container: tested `/corpus/upload` (HTTP 200) and `/corpus/reseed` (HTTP 200).
+
+### [2026-09-27] Live VS Arena, Voice Streaming, GPU Acceleration & Full Documentation Refresh
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - **Interactive Side-by-Side VS Arena (`/ws/dual_stream`):** Implemented real-time concurrent evaluation of Streaming Live RAG vs. Naive Sequential RAG. Runs parallel pipelines via `asyncio.gather` with isolated sessions (`sess_left`, `sess_right`). Added `ignore_cache=True` to guarantee unbiased head-to-head benchmarking without warm cache contamination. Added side-by-side latency meters (TTFT, retrieval time, tokens/sec, grounding score).
+  - **Synchronized Live Voice & Audio Streaming:** Integrated Web Speech API and MediaRecorder in the frontend. Live microphone speech streams cumulative transcripts to both pipelines concurrently with real-time waveform visualization, proving early provisional retrieval at $t_1$ while speaking.
+  - **Hardware GPU Acceleration (NVIDIA CUDA 12):** Auto-detected host NVIDIA GeForce RTX 5060 Laptop GPU (8GB VRAM). Resolved Windows PyTorch CUDA 12 dynamic libraries (`cublas64_12.dll`, `cudart64_12.dll`, `cudnn`) via `os.add_dll_directory` for ONNX Runtime `CUDAExecutionProvider`. FastEmbed dense embeddings (`bge-small`) and Cross-Encoder reranker (`ms-marco-MiniLM`) drop from ~50–120ms to **~3.0ms** with graceful silent CPU fallback. Added `GET /system/hardware` diagnostics endpoint and UI navbar indicator badge.
+  - **Multi-Format Corpus Ingestion Engine:** Upgraded `retrieval/ingest.py` with PDF text extraction (`pypdf`), SHA-256 content deduplication, and stable Doc ID mapping (`Doc_01` to `Doc_06`), indexing 173 chunks across technical manuals, OS concepts, policies, and resumes.
+  - **Windows Launchers & Expanded Testing:** Created `start.bat` and `start.ps1`. Expanded test suite to 26 unit tests in `tests/test_pipeline.py` (100% passing).
+  - **Full Documentation Refresh:** Thoroughly updated root `README.md`, `streaming-live-rag/README.md`, `docs/ARCHITECTURE_BRIEF.md`, `docs/RUNBOOK.md`, `docs/BENCHMARK_REPORT.md`, `docs/CHECKLIST.md`, and this collaboration log to comprehensively detail all new features, architecture decisions, benchmark results, and operational runbooks.
+### [2026-09-27] Strict Doc 1 and 2 Corpus Startup Isolation
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - Configured system to strictly keep only Doc 1 (`venue_booking.txt`) and Doc 2 (`travel_policy.txt`) on the indexed corpus whenever the application starts.
+  - Relocated extra sample PDFs (`Doc_03_Module_5_memory_management.pdf`, `Doc_03_Segmentation.pdf`, `Doc_03_Yuvraj_s_Resume.pdf`, `Doc_04_Module_4_Concurrency.pdf`) from `data/dev_corpus/` to `data/sample_documents/` and updated `ingest_file_or_text` to store dynamic uploads in `data/uploads/`, keeping `data/dev_corpus/` pristine.
+  - Updated `_auto_seed_corpus_on_startup()` in `api/main.py` to check that the indexed corpus has strictly `Doc_01` and `Doc_02` (4 chunks total), resetting automatically on boot if any extra documents exist.
+  - Updated `/corpus/reset` and `/corpus/reseed` routes and `ingest()` in `retrieval/ingest.py` to enforce `allowed_docs={"Doc_01", "Doc_02"}` by default.
+  - Verified: Qdrant collection `dev_corpus_dense` contains exactly 4 chunks (`Doc_01 §1`, `Doc_01 §2`, `Doc_02 §1`, `Doc_02 §2`).
+  - Tested: All 26 unit tests continue to pass (`pytest tests/ -v`). Server restarted and running live with CUDA GPU acceleration.
+- **Next Steps for AI/Human Teammates:**
+  - Verify `http://localhost:8000/corpus` returns strictly Doc 1 and Doc 2.
+
+### [2026-09-29] Continuous Multi-Intent Speculative Streaming, Query Caching, Route Aliasing & Documentation Harmonization
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - **Continuous Multi-Intent Speculative Streaming Search:**
+    - Upgraded `streaming/engine.py` with multi-clause continuous parsing (`split_intent_clauses`, `extract_topic`, `_contextualize_clause`).
+    - Detects multiple distinct clauses during active speech and fires up to 4 parallel speculative hybrid searches at $t_1, t_2, \dots$ while the user is still speaking.
+    - Implemented collective coverage checking (`_is_covered` with 70% token/stem matching) preventing redundant delta searches upon `utterance_end`.
+  - **Instant Query Response Cache (`_QUERY_CACHE`):**
+    - Added thread-safe normalized query response caching in `streaming/engine.py` with instant Phase 0 thought streaming for repeated queries, eliminating unnecessary LLM calls.
+  - **Dual-Stream & VS Arena Route Aliasing:**
+    - Registered `@app.websocket("/ws/dual_stream")` as an official route alongside `@app.websocket("/ws/compare")` in `api/main.py` for seamless client compatibility.
+    - Added WebSocket `cancel` message handling to cleanly terminate active turns without orphan background tasks.
+    - Added guard against idle timeout phantom turns when no audio/text was pushed.
+  - **Testing & Verification:**
+    - Verified all 26 unit tests pass (`pytest -v`) in 3.93s covering grounding, abstention, heuristics, intent deduplication, multi-intent streaming, session lifecycle, cache hits, compare endpoints, and thought phases.
+  - **Documentation Suite Harmonization:**
+    - Updated `agents.md`, `README.md`, `streaming-live-rag/README.md`, `docs/ARCHITECTURE_BRIEF.md`, `docs/RUNBOOK.md`, `docs/CHECKLIST.md`, `docs/BENCHMARK_REPORT.md`, `docs/EXECUTION_PLAN.md`, `docs/RISKS.md`, and ADRs with unified architectural details, hardware acceleration specifications, and live benchmarking procedures.
+- **Next Steps for AI/Human Teammates:**
+  - Project is feature-complete, verified, tested, and fully documented for hackathon evaluation and demonstration.
+
+
+
+
+
 
 
 

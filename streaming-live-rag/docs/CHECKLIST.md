@@ -7,19 +7,24 @@ This checklist tracks engineering deliverables and official submission requireme
 ## 1. Engineering & Codebase Deliverables (All Completed)
 
 - [x] **Working Prototype Code:** Full streaming live RAG pipeline implemented (`api/main.py`, two-stage controller, multi-intent decomposition, hybrid Qdrant search, session refinement, claim-level grounding).
+- [x] **Live Side-by-Side VS Arena (`/ws/dual_stream`):** Real-time concurrent arena comparing Streaming Live RAG vs. Naive Sequential RAG head-to-head via `asyncio.gather` with independent session isolation and cache-bypassing (`ignore_cache=True`).
+- [x] **Synchronized Live Voice & Audio Streaming:** Integrated browser Web Speech API & MediaRecorder for speaking queries in real time; cumulative transcript chunks stream concurrently to both pipelines with live audio visualizer waves.
+- [x] **Hardware GPU Acceleration (NVIDIA CUDA & DirectML):** ONNX Runtime `CUDAExecutionProvider` bound dynamically on Windows with PyTorch CUDA 12 libraries (`cublas64_12.dll`, `cudart64_12.dll`, `cudnn`); drops dense embedding and cross-encoder reranking down to **~3.0ms** with graceful CPU fallback.
+- [x] **Hardware Diagnostics & Observability:** `/system/hardware` endpoint and live UI indicator badge for GPU device name, VRAM, and ONNX execution providers.
+- [x] **Multi-Format Document Ingestion & Deduplication:** Corpus parser in `retrieval/ingest.py` supporting **PDF**, **TXT**, and **MD** documents with SHA-256 content deduplication and stable Doc IDs (`Doc_01` to `Doc_06`), indexing 173+ chunks.
 - [x] **Unified Live Turn Engine & 4-Phase Honest Thought Stream:** Core pipeline unified in `streaming/engine.py` and `streaming/live_stream.py`, emitting real-time honest telemetry events across 4 phases (`intent_detected`, `provisional_search`, `decomposition_planned`, `synthesis_ready`) for both WebSocket (`/ws/stream`) and HTTP (`/turn`) transports.
 - [x] **Embedded Local Storage Auto-Fallback:** `retrieval/hybrid_search.py` gracefully falls back to local on-disk Qdrant storage (`data/qdrant_storage`), allowing full offline execution without requiring Docker Desktop to be running.
-- [x] **Reproducible Packaging (Gate 1):** Single-command setup via Python direct run (`pip install -r requirements.txt && python -m uvicorn api.main:app`) and Docker (`docker compose up --build -d`).
-- [x] **Pre-cached Embeddings & Deterministic Build:** Dockerfile and local environment cache FastEmbed models (`bge-small`, `bm25`, `ms-marco-MiniLM`) to prevent network timeouts during evaluation.
-- [x] **Automated Unit Test Suite:** 22/22 unit tests passing in `tests/test_pipeline.py` and `tests/test_thought_stream.py`.
+- [x] **Reproducible Packaging (Gate 1):** Single-command setup via Python direct run (`pip install -r requirements.txt && python -m uvicorn api.main:app`), Windows launchers (`start.bat`, `start.ps1`), and Docker (`docker compose up --build -d`).
+- [x] **Pre-cached Embeddings & Deterministic Build:** Local environment and Docker cache FastEmbed models (`bge-small`, `bm25`, `ms-marco-MiniLM`) to prevent network timeouts during evaluation.
+- [x] **Automated Unit Test Suite:** 26/26 unit tests passing in `tests/test_pipeline.py` and `tests/test_thought_stream.py`.
 - [x] **Evaluation Gate Suite (Gates G1–G6):** Master evaluation runner (`eval/run_eval.py`, `run_eval.bat`, `run_eval.sh`). Scorecard in `eval/results/scorecard.json` and `eval/results/scorecard.md`.
-- [x] **Interactive Demonstration Dashboard:** Tabbed Web UI (`static/index.html`) featuring live 4-phase thought stream animations, chunk-by-chunk speech streaming, BYOK runtime credential modal, corpus inspector, and latency waterfall charts.
+- [x] **Interactive Demonstration Dashboard:** Tabbed Web UI (`static/index.html`) featuring live VS Arena, real-time voice streaming with waveform animation, 4-phase thought stream animations, chunk-by-chunk speech streaming, BYOK runtime credential modal, corpus inspector, and latency waterfall charts.
 - [x] **Cloudflare Quick Tunnel Integration:** Ready-to-run tunnel command (`cloudflared tunnel --url http://localhost:8000`) for sharing live interactive demo without opening ports.
 - [x] **Full Documentation Suite:**
-  - `README.md` (root & subfolder) — 3-command quick start, architecture overview, 4-phase thought stream, and scorecard summary.
-  - `docs/RUNBOOK.md` — Complete operational runbook covering setup, execution modes, WebSocket/HTTP contracts, and QA checks.
-  - `docs/BENCHMARK_REPORT.md` — Verified gate scores, latency profiles, Ablations #1 & #2, and documented edge cases.
-  - `docs/ARCHITECTURE_BRIEF.md` — End-to-end component flow, telemetry schema, and boundary contracts.
+  - `README.md` (root & subfolder) — Architecture overview, quickstart, VS Arena, live voice input, GPU acceleration, 4-phase thought stream, and scorecard summary.
+  - `docs/RUNBOOK.md` — Complete operational runbook covering setup, execution modes, VS Arena usage, live voice, hardware diagnostics, and QA checks.
+  - `docs/BENCHMARK_REPORT.md` — Verified gate scores, GPU vs CPU latency profile, Ablations #1 to #4 (including VS Arena and Thought Stream), and documented edge cases.
+  - `docs/ARCHITECTURE_BRIEF.md` — End-to-end component flow, VS Arena sequence diagram, hardware acceleration architecture, and boundary contracts.
   - `docs/adr/` — Complete Architectural Decision Records (ADR-1 through ADR-5).
   - `agents.md` — Synchronized chronological collaboration log.
 
@@ -30,6 +35,7 @@ This checklist tracks engineering deliverables and official submission requireme
 - [ ] **Confirm Team Registration:** Ensure college/team registration details match PRISM records.
 - [ ] **Record Demo Video (≤ 5 minutes):**
   - Walk through the Interactive Demo Dashboard (`http://localhost:8000`).
+  - Demonstrate Side-by-Side VS Arena with live microphone voice input.
   - Demonstrate 4-Phase Honest Thought Stream in real time.
   - Demonstrate Scenario 1 (Early Retrieval at $t_1$).
   - Demonstrate Scenario 2 (Multi-Intent parallel retrieval with Quota Merge).
@@ -61,5 +67,7 @@ This checklist tracks engineering deliverables and official submission requireme
 | **No hardcoding / no precomputation** | Decomposer, controller, and synthesizer use dynamic LLM prompts and deterministic heuristics; zero canned answers. | Verified |
 | **Rigorous factual grounding** | Deterministic 44-line validator checks `[Doc_ID §Section]` tags against retrieved context; 0 fabricated IDs. | Verified |
 | **Session-bound state** | Ephemeral in-memory store keyed strictly by `session_id`; zero cross-session data leakage or persistent user profiles. | Verified |
-| **Architectural parsimony** | Dual-provider setup (Groq for sub-400ms controller, Gemini for synthesis, FastEmbed ONNX local embeddings). | Verified |
+| **Architectural parsimony** | Dual-provider setup (Groq for sub-400ms controller, Gemini for synthesis, FastEmbed ONNX GPU-accelerated local embeddings). | Verified |
 | **Honest Thought Narration** | Thoughts reflect genuine system execution without artificial delays or canned text. | Verified |
+| **Fair Head-to-Head Comparison** | VS Arena isolates sessions and supports `ignore_cache=True` for unbiased evaluation. | Verified |
+| **Hardware GPU Acceleration** | FastEmbed and Cross-Encoder bind CUDA on NVIDIA RTX 5060 Laptop GPU with silent CPU fallback. | Verified |

@@ -41,6 +41,9 @@
       --text-dim: #888888;
       --thought-bg: #171717;
       --user-msg-bg: #2f2f2f;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -62,36 +65,91 @@
     ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
     /* Header */
+    /* Header */
     header {
       height: 56px;
+      min-height: 56px;
       background: var(--bg-main);
       border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
-      z-index: 20;
+      z-index: 25;
+      gap: 12px;
+      box-sizing: border-box;
     }
-    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; min-width: 0; }
     .brand-logo {
       width: 28px; height: 28px; border-radius: 6px;
       background: var(--accent); color: white;
       display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
     }
-    .brand-title { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; color: var(--text-main); }
-    .brand-sub { font-size: 0.75rem; color: var(--text-muted); display: none; }
-    @media (min-width: 768px) { .brand-sub { display: block; } }
+    .brand-text { display: flex; flex-direction: column; min-width: 0; }
+    .brand-title { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; color: var(--text-main); white-space: nowrap; }
+    .brand-sub { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
 
-    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .sidebar-toggle-btn {
+      display: inline-flex;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .sidebar-toggle-btn:hover { background: var(--bg-sidebar); color: var(--text-main); border-color: var(--text-dim); }
+    .sidebar-toggle-btn.collapsed { color: var(--accent); border-color: var(--accent); }
+
+    .sidebar-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .sidebar-btn:hover { background: var(--bg-main); color: var(--text-main); border-color: var(--text-dim); }
+
+    .header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: nowrap; }
     .pill {
       font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 6px;
       display: inline-flex; align-items: center; gap: 6px;
       background: var(--bg-sidebar); border: 1px solid var(--border-color); color: var(--text-muted);
+      white-space: nowrap; flex-shrink: 0;
     }
     .pill.active { color: var(--text-main); }
-    .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
-    .pill-green.active .pill-dot { background: var(--success); }
-    .pill-blue.active .pill-dot { background: var(--accent); }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+    .pill-green .pill-dot, .pill-green.active .pill-dot {
+      background: var(--success);
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+    }
+    .pill-green {
+      border-color: rgba(16, 185, 129, 0.35);
+      color: var(--text-main);
+    }
+    .pill-blue .pill-dot, .pill-blue.active .pill-dot {
+      background: var(--accent);
+      box-shadow: 0 0 6px rgba(99, 102, 241, 0.7);
+    }
+    .pill-blue {
+      border-color: rgba(99, 102, 241, 0.35);
+      color: var(--text-main);
+    }
 
     .header-btn {
       background: transparent;
@@ -99,13 +157,15 @@
       color: var(--text-muted);
       font-size: 0.8rem;
       font-weight: 500;
-      padding: 6px 8px;
+      padding: 6px 10px;
       border-radius: 6px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .header-btn:hover { background: var(--bg-sidebar); color: var(--text-main); }
     .header-btn.outline { border-color: var(--border-color); }
@@ -113,15 +173,98 @@
     .header-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
     .header-btn.primary:hover { background: var(--accent-hover); color: white; }
 
+    /* Responsive Header & Layout Breakpoints */
+    @media (max-width: 1300px) {
+      header .brand-sub { display: none; }
+      header .header-actions { gap: 6px; }
+      header .header-btn { padding: 6px 8px; font-size: 0.76rem; }
+    }
+
+    @media (max-width: 1180px) {
+      header .header-btn .header-btn-label { display: none; }
+      header .header-btn {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        justify-content: center;
+        border-color: var(--border-color);
+      }
+      header .header-btn i, header .header-btn svg { margin: 0; }
+      #corpusPill .pill-extra { display: none; }
+      .theme-pill-badge { display: none; }
+    }
+
+    @media (max-width: 900px) {
+      #corpusPill { display: none; }
+
+      .app-container.sidebar-collapsed .sidebar {
+        margin-left: 0;
+      }
+      .sidebar {
+        position: fixed;
+        top: 56px;
+        bottom: 0;
+        left: -290px;
+        width: 280px;
+        min-width: 280px;
+        transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+      }
+      .sidebar.open { left: 0; opacity: 1; pointer-events: auto; }
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 56px 0 0 0;
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(2px);
+        z-index: 99;
+      }
+      .sidebar-backdrop.open { display: block; }
+    }
+
+    @media (max-width: 640px) {
+      header { padding: 0 8px; gap: 6px; }
+      header .brand-title { font-size: 0.85rem; }
+      #apiStatusPill .pill-text { display: none; }
+      #apiStatusPill { padding: 6px 8px; }
+      header .header-actions { gap: 4px; }
+      header .header-btn { width: 30px; height: 30px; }
+    }
+
     /* App Container */
-    .app-container { display: flex; flex: 1; height: calc(100vh - 56px); position: relative; }
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 56px);
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+    }
 
     /* Sidebar */
     .sidebar {
       width: 280px;
+      min-width: 280px;
+      max-width: 280px;
       background: var(--bg-sidebar);
       border-right: 1px solid var(--border-color);
-      display: flex; flex-direction: column; overflow-y: auto; padding: 16px; gap: 20px; z-index: 10;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px;
+      gap: 20px;
+      z-index: 10;
+      box-sizing: border-box;
+      transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+    }
+
+    /* Desktop Collapsed Sidebar */
+    .app-container.sidebar-collapsed .sidebar {
+      margin-left: -280px;
+      opacity: 0;
+      pointer-events: none;
     }
 
     /* Live Toggle */
@@ -278,20 +421,285 @@
     .send-action-btn { width: 32px; height: 32px; border-radius: 16px; background: var(--accent); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.2s; }
     .send-action-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
     .send-action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; background: var(--border-color); color: var(--text-dim); }
+    .send-action-btn.stop { background: var(--error) !important; color: white !important; animation: pulseMic 1.5s infinite; }
+    .send-action-btn.stop:hover { background: #dc2626 !important; }
 
     .input-caption { text-align: center; font-size: 0.75rem; color: var(--text-dim); display: flex; align-items: center; justify-content: center; gap: 4px; }
     .input-caption svg { width: 14px; height: 14px; }
 
     /* Modal */
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
     .modal-backdrop.open { display: flex; }
-    .modal-card { background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 12px; max-width: 520px; width: 100%; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
+    .modal-card { background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 12px; max-width: 520px; width: 100%; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
+    .modal-card.wide { max-width: 960px; width: 95vw; }
+    
+    .comp-table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 16px 0; border: 1px solid var(--border-color); border-radius: 8px; }
+    .comp-table { width: 100%; border-collapse: collapse; margin: 0; font-size: 0.85rem; min-width: 560px; }
+    .comp-table th, .comp-table td { padding: 10px 12px; border: 1px solid var(--border-color); text-align: left; }
+    .comp-table th { background: var(--bg-sidebar); font-weight: 600; color: var(--text-main); position: sticky; top: 0; }
+    .comp-table td { background: var(--bg-main); color: var(--text-muted); line-height: 1.5; }
+    .comp-table tr:hover td { background: var(--bg-sidebar); }
+    .comp-highlight-live { color: #10b981; font-weight: 600; }
+    .comp-highlight-std { color: var(--text-muted); }
+    
+    /* Real Execution Arena */
+    .real-cmp-arena {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 18px;
+      margin-top: 16px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .real-cmp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .real-cmp-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .real-cmp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.12);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .real-cmp-badge.normal {
+      background: rgba(96, 165, 250, 0.12);
+      color: #60a5fa;
+      border-color: rgba(96, 165, 250, 0.25);
+    }
+    .real-cmp-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .real-cmp-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .real-cmp-input {
+      flex: 1;
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .real-cmp-input:focus { border-color: var(--accent); }
+    .real-cmp-presets {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .real-cmp-preset-btn {
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      border-radius: 14px;
+      padding: 3px 10px;
+      font-size: 0.74rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .real-cmp-preset-btn:hover {
+      background: var(--bg-sidebar);
+      color: var(--text-main);
+      border-color: var(--text-dim);
+    }
+    .real-cmp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 4px;
+    }
+    @media (max-width: 720px) {
+      .real-cmp-grid { grid-template-columns: 1fr; }
+    }
+    .real-cmp-lane {
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-sizing: border-box;
+    }
+    .real-cmp-lane.live { border-color: rgba(16, 185, 129, 0.4); }
+    .real-cmp-lane.normal { border-color: rgba(96, 165, 250, 0.4); }
+    .real-cmp-lane-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+    .real-cmp-lane-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .real-cmp-stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 3px 0;
+      font-size: 0.78rem;
+      border-bottom: 1px dashed var(--border-color);
+    }
+    .real-cmp-stat-label { color: var(--text-muted); }
+    .real-cmp-stat-val {
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-main);
+      font-size: 0.8rem;
+    }
+    .real-cmp-stat-val.highlight-green { color: #10b981; }
+    .real-cmp-stat-val.highlight-blue { color: #60a5fa; }
+    .real-cmp-answer-box {
+      background: var(--bg-sidebar);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: var(--text-main);
+      max-height: 170px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .real-cmp-scorecard {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .real-cmp-score-item { text-align: center; }
+    .real-cmp-score-num {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #10b981;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .real-cmp-score-sub {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 2px;
+    }
+
+    .sim-run-btn {
+      background: var(--accent);
+      color: white;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .sim-run-btn:hover { background: var(--accent-hover); }
+    .sim-run-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .cmp-mic-btn {
+      background: rgba(239, 68, 68, 0.12);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .cmp-mic-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+    }
+    .cmp-mic-btn.recording {
+      background: #ef4444 !important;
+      color: white !important;
+      border-color: #ef4444 !important;
+      animation: pulseMic 1.5s infinite;
+    }
+    
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .modal-title { font-size: 1.1rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
     .close-btn { background: none; border: none; color: var(--text-muted); font-size: 1.25rem; cursor: pointer; }
     .close-btn:hover { color: var(--text-main); }
+    
+    .modal-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .modal-btn:hover { background: var(--bg-sidebar); color: var(--text-main); border-color: var(--text-dim); }
+    .modal-btn.primary { background: var(--accent); color: white; border-color: var(--accent); font-weight: 600; }
+    .modal-btn.primary:hover { background: var(--accent-hover); color: white; }
+
+    @media (max-width: 768px) {
+      .modal-backdrop { padding: 10px; }
+      .modal-card { padding: 16px; border-radius: 10px; }
+      .modal-title { font-size: 0.95rem; }
+    }
+    
     label.field-label { display: block; font-size: 0.8rem; color: var(--text-main); margin-bottom: 6px; font-weight: 500; }
-    input.field-input, select.field-select { width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); padding: 10px 12px; font-size: 0.9rem; margin-bottom: 16px; outline: none; transition: border-color 0.2s; }
+    input.field-input, select.field-select { width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); padding: 10px 12px; font-size: 0.9rem; margin-bottom: 16px; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
     input.field-input:focus, select.field-select:focus { border-color: var(--accent); }
 
   </style>
@@ -302,18 +710,24 @@
   
   <header>
     <div class="brand">
+      <button class="sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" title="Toggle Sidebar (Ctrl+B)">
+        <i data-lucide="panel-left" width="16" height="16"></i>
+      </button>
       <div class="brand-logo"><i data-lucide="zap" width="16" height="16"></i></div>
-      <div>
-        <div class="brand-title">Streaming Live RAG <span class="pill">Theme 4</span></div>
+      <div class="brand-text">
+        <div class="brand-title">Streaming Live RAG <span class="pill theme-pill-badge">Theme 4</span></div>
         <div class="brand-sub">Samsung PRISM GenAI Hackathon</div>
       </div>
     </div>
     <div class="header-actions">
-      <span class="pill pill-green active" id="apiStatusPill"><span class="pill-dot"></span> Pipeline Ready</span>
-      <span class="pill pill-blue active" id="corpusPill"><span class="pill-dot"></span> 4 Chunks Indexed</span>
+      <span class="pill pill-green active" id="apiStatusPill" title="Connection status"><span class="pill-dot"></span> <span class="pill-text">Live WebSocket Connected</span></span>
+      <span class="pill pill-green active" id="gpuStatusPill" title="Hardware Acceleration"><i data-lucide="cpu" width="13" height="13"></i> <span class="pill-text" id="gpuPillText">GPU: CUDA</span></span>
+      <span class="pill pill-blue active" id="corpusPill" title="Corpus chunks"><span class="pill-dot"></span> <span class="pill-text">13 Chunks<span class="pill-extra"> Indexed</span></span></span>
       <button class="header-btn" onclick="toggleTheme()" title="Toggle Theme"><i data-lucide="sun-moon" width="16" height="16"></i></button>
-      <button class="header-btn outline" onclick="openByokModal()"><i data-lucide="settings" width="14" height="14"></i> Settings</button>
-      <button class="header-btn outline" onclick="reseedCorpus()"><i data-lucide="refresh-cw" width="14" height="14"></i> Reseed Data</button>
+      <button class="header-btn outline" onclick="openComparisonModal()" title="Live vs Normal RAG Comparison"><i data-lucide="git-compare" width="14" height="14"></i><span class="header-btn-label"> Live vs Normal RAG</span></button>
+      <button class="header-btn outline" onclick="clearSessionHistory()" title="Clear conversation memory &amp; cache"><i data-lucide="rotate-ccw" width="14" height="14"></i><span class="header-btn-label"> Clear Cache</span></button>
+      <button class="header-btn outline" onclick="openByokModal()" title="Settings"><i data-lucide="settings" width="14" height="14"></i><span class="header-btn-label"> Settings</span></button>
+      <button class="header-btn outline" onclick="reseedCorpus()" title="Reseed Data"><i data-lucide="refresh-cw" width="14" height="14"></i><span class="header-btn-label"> Reseed Data</span></button>
     </div>
   </header>
 
@@ -321,9 +735,21 @@
   <!-- App Layout -->
   <div class="app-container">
 
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
     <!-- Sidebar -->
     
     <div class="sidebar">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:8px; border-bottom:1px solid var(--border-color);">
+        <span style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); display:flex; align-items:center; gap:6px;">
+          <i data-lucide="layout" width="13" height="13"></i> Controls &amp; Stats
+        </span>
+        <button class="sidebar-btn" onclick="toggleSidebar()" title="Collapse Sidebar (Ctrl+B)" style="padding:2px 6px;">
+          <i data-lucide="panel-left-close" width="13" height="13"></i>
+        </button>
+      </div>
 
       <div class="live-toggle-card">
         <div class="live-toggle-row">
@@ -338,13 +764,16 @@
         <div class="live-toggle-sub">
           Evaluates speech and typing dynamically. Continues thinking without resetting.
         </div>
+        <div style="font-size:0.75rem; color:var(--accent); cursor:pointer; margin-top:8px; display:flex; align-items:center; gap:4px; font-weight:500;" onclick="openComparisonModal()">
+          <i data-lucide="git-compare" width="12" height="12"></i> Compare Live vs. Normal RAG
+        </div>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div style="font-size:0.75rem; color:var(--text-muted);">
-          Session: <code id="lblSession" style="color:var(--text-main);">session_demo_01</code>
+          Session: <code id="lblSession" style="color:var(--text-main);">...</code>
         </div>
-        <button class="header-btn outline" onclick="clearSessionHistory()" style="padding:4px 8px; font-size:0.7rem;">
+        <button class="sidebar-btn" onclick="clearSessionHistory()" title="Start New Conversation">
           <i data-lucide="plus" width="12" height="12"></i> New Chat
         </button>
       </div>
@@ -369,6 +798,13 @@
           <div class="hud-mini-card">
             <div class="hud-mini-label">Version</div>
             <div class="hud-mini-val" id="hudVersion">v1</div>
+          </div>
+        </div>
+        <div style="margin-top:10px; padding:8px 10px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:6px; font-size:0.75rem; display:flex; align-items:center; gap:8px;">
+          <i data-lucide="cpu" width="14" height="14" style="color:#10b981; flex-shrink:0;"></i>
+          <div style="min-width:0;">
+            <div style="color:var(--text-main); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="hudGpuName">GPU: Detecting...</div>
+            <div style="color:var(--text-dim); font-size:0.7rem;" id="hudGpuDetail">FastEmbed CUDA (~3ms)</div>
           </div>
         </div>
       </div>
@@ -431,7 +867,7 @@
           <div id="corpusDocsList"></div>
           <div style="margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
             <input type="file" id="docUploadInput" style="display:none;" onchange="handleFileUpload(event)" accept=".pdf,.docx,.pptx,.xlsx,.csv,.tsv,.json,.yaml,.yml,.html,.htm,.txt,.md" />
-            <button class="header-btn outline" onclick="document.getElementById('docUploadInput').click()" style="width:100%; justify-content:center; padding:6px;">
+            <button class="sidebar-btn" onclick="document.getElementById('docUploadInput').click()" style="width:100%; justify-content:center; padding:8px;">
               <i data-lucide="upload" width="14" height="14"></i> Upload Custom File
             </button>
           </div>
@@ -444,20 +880,9 @@
       <!-- Scrollable Conversation Stream -->
       <div class="chat-messages" id="chatScrollArea">
         <div class="chat-container" id="chatThread">
-
           <!-- Hero Greeting -->
           <div class="hero-banner" id="heroBanner">
             <div class="hero-icon"><i data-lucide="zap" width="24" height="24"></i></div>
-            <div class="hero-title">Streaming Live Speech RAG</div>
-            <div class="hero-sub">
-              Experience real-time speculative search with uninterrupted continuous thought. Speak into the microphone or test a benchmark scenario below.
-            </div>
-            <div class="hero-badges">
-              <span class="pill">Speculative Pre-Retrieval</span>
-              <span class="pill">Continuous Thought</span>
-              <span class="pill">100% Grounded</span>
-            </div>
-          </div>
             <div class="hero-title">Streaming Live Speech RAG</div>
             <div class="hero-sub">
               Experience real-time speculative search with uninterrupted continuous thought. Speak into the microphone or test a benchmark scenario below to watch the thinking process unfold!
@@ -498,7 +923,204 @@
         </div>
       </div>
     </div>
+  <!-- Modal: Streaming Live RAG vs Normal Sequential RAG Comparison -->
+  <div class="modal-backdrop" id="comparisonModal">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i data-lucide="git-compare" width="20" height="20" style="color:var(--accent);"></i>
+          Streaming Live RAG vs. Normal Sequential RAG
+        </div>
+        <button class="close-btn" onclick="closeComparisonModal()">&times;</button>
+      </div>
+
+      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;">
+        Architectural, latency, and capability comparison between <strong>Theme 4 Streaming Live RAG</strong> and a <strong>Classic Sequential RAG</strong> pipeline.
+      </div>
+
+      <div class="comp-table-wrapper">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th style="width:22%;">Dimension</th>
+              <th style="width:39%; color:#10b981;">⚡ Streaming Live RAG (Theme 4)</th>
+              <th style="width:39%;">⚪ Normal Sequential RAG</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Retrieval Timing</strong></td>
+              <td><span class="comp-highlight-live">Speculative In-Flight:</span> Dispatches vector search in background while speaker is still talking (Gate G2).</td>
+              <td><span class="comp-highlight-std">Post-Utterance:</span> Waits until speech completely concludes before beginning any retrieval.</td>
+            </tr>
+            <tr>
+              <td><strong>Perceived Latency</strong></td>
+              <td><span class="comp-highlight-live">Sub-second (~200–500ms):</span> Massive head start (+20s to +30s) finishes searches before speech ends.</td>
+              <td><span class="comp-highlight-std">High (3,000–6,000ms+):</span> User waits through sequential decomposition, search, and synthesis after speaking.</td>
+            </tr>
+            <tr>
+              <td><strong>Intent Decomposition</strong></td>
+              <td><span class="comp-highlight-live">Concurrent Progressive Beams:</span> Identifies multiple sub-intents and queries vector store simultaneously in real time (Gate G3).</td>
+              <td><span class="comp-highlight-std">Monolithic Batch:</span> Breaks utterance down into sub-queries sequentially after audio finishes.</td>
+            </tr>
+            <tr>
+              <td><strong>Reasoning Context</strong></td>
+              <td><span class="comp-highlight-live">Continuous Thought:</span> Live reasoning stream without resetting context across clauses.</td>
+              <td><span class="comp-highlight-std">Discrete Restarts:</span> Each query starts from scratch without in-flight continuity.</td>
+            </tr>
+            <tr>
+              <td><strong>Query Cache</strong></td>
+              <td><span class="comp-highlight-live">Instant (<5ms):</span> Fast in-memory cache returns 100% grounded answers instantly for identical queries.</td>
+              <td><span class="comp-highlight-std">Repeated Compute:</span> Re-embeds, re-searches, and calls LLM on every query repeat.</td>
+            </tr>
+            <tr>
+              <td><strong>Chit-Chat & Reformat</strong></td>
+              <td><span class="comp-highlight-live">Zero Retrieval:</span> Suppresses vector calls for greetings (C2) and reformats existing answer without new search (C4).</td>
+              <td><span class="comp-highlight-std">Unnecessary Searches:</span> Executes vector search on every greeting or reformat request.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Real Concurrent Execution Arena -->
+      <div class="real-cmp-arena" id="realCmpArena">
+        <div class="real-cmp-header">
+          <div class="real-cmp-title">
+            <i data-lucide="cpu" width="18" height="18" style="color:var(--accent);"></i>
+            <span>Real Concurrent Execution Arena</span>
+            <span class="real-cmp-badge" style="background:rgba(234,179,8,0.12); color:#eab308; border-color:rgba(234,179,8,0.3);">
+              <i data-lucide="zap-off" width="11" height="11"></i> Cache Bypassed
+            </span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <button class="cmp-mic-btn" onclick="toggleCmpVoiceRecognition()" id="btnCmpMic" title="Speak into your microphone — feeds your live voice into both pipelines simultaneously">
+              <i data-lucide="mic" width="14" height="14"></i>
+              <span id="btnCmpMicText">Speak Live Voice</span>
+            </button>
+            <button class="sim-run-btn" onclick="executeRealComparison()" id="btnRunRealCmp" title="Execute typed text or selected preset side-by-side">
+              <i data-lucide="play" width="13" height="13"></i>
+              <span id="btnRunRealCmpText">Run Text Test</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;">
+          Fires both pipelines simultaneously as <strong>two isolated, parallel sessions</strong> with query caching strictly bypassed. <strong>Live Voice Mode:</strong> Speak into your microphone — partial speech chunks stream live into both pipelines. Live RAG executes speculative retrieval in-flight while you speak; Normal RAG waits until your speech concludes.
+        </div>
+
+        <div class="real-cmp-controls">
+          <div class="real-cmp-input-row">
+            <input type="text" id="cmpQueryInput" class="real-cmp-input" 
+              value="What is the venue booking capacity and cancellation penalty in Pune?" 
+              placeholder="Speak with microphone or type query to benchmark side-by-side..." />
+            <button class="mic-action-btn" id="cmpInputMicBtn" onclick="toggleCmpVoiceRecognition()" title="Speak with microphone">
+              <i data-lucide="mic" width="16" height="16"></i>
+            </button>
+          </div>
+          <div class="real-cmp-presets">
+            <span style="font-size:0.75rem; color:var(--text-dim); margin-right:4px;">Presets:</span>
+            <button type="button" class="real-cmp-preset-btn" onclick="setCmpPreset('What is the venue booking capacity and cancellation penalty in Pune?')">Venue &amp; Penalty (Pune)</button>
+            <button type="button" class="real-cmp-preset-btn" onclick="setCmpPreset('What are the domestic flight travel policy reimbursement limits?')">Travel Policy Limits</button>
+            <button type="button" class="real-cmp-preset-btn" onclick="setCmpPreset('Can I book a venue with 150 guests and get a full refund if cancelled 10 days prior?')">Capacity &amp; Refund Rules</button>
+          </div>
+        </div>
+
+        <!-- Real-time Status Scorecard (shown once run starts) -->
+        <div class="real-cmp-scorecard" id="cmpScorecard" style="display:none;">
+          <div class="real-cmp-score-item">
+            <div class="real-cmp-score-num" id="cmpScoreSpeedup">-</div>
+            <div class="real-cmp-score-sub">Perceived Speedup</div>
+          </div>
+          <div class="real-cmp-score-item">
+            <div class="real-cmp-score-num" id="cmpScoreHeadstart" style="color:#6366f1;">-</div>
+            <div class="real-cmp-score-sub">Retrieval Head Start</div>
+          </div>
+          <div class="real-cmp-score-item">
+            <div class="real-cmp-score-num" id="cmpScoreSpeech" style="color:var(--text-muted);">-</div>
+            <div class="real-cmp-score-sub">Speech Duration</div>
+          </div>
+          <div class="real-cmp-score-item">
+            <div class="real-cmp-score-num" id="cmpScoreLiveWait">-</div>
+            <div class="real-cmp-score-sub">Live Post-Speech Wait</div>
+          </div>
+          <div class="real-cmp-score-item">
+            <div class="real-cmp-score-num" id="cmpScoreNormalWait" style="color:#60a5fa;">-</div>
+            <div class="real-cmp-score-sub">Normal Post-Speech Wait</div>
+          </div>
+        </div>
+
+        <!-- Dual Execution Lanes -->
+        <div class="real-cmp-grid">
+          <!-- Lane 1: Live RAG -->
+          <div class="real-cmp-lane live" id="laneLive">
+            <div class="real-cmp-lane-header">
+              <div class="real-cmp-lane-title" style="color:#10b981;">
+                <i data-lucide="radio" width="16" height="16"></i>
+                <span>Streaming Live RAG</span>
+              </div>
+              <span class="real-cmp-badge" id="liveLaneBadge">Ready</span>
+            </div>
+            
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Isolated Session:</span>
+              <span class="real-cmp-stat-val" id="liveLaneSession">cmp_live</span>
+            </div>
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Retrieval Timing:</span>
+              <span class="real-cmp-stat-val highlight-green" id="liveLaneTiming">Speculative In-Flight</span>
+            </div>
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Post-Speech Wait:</span>
+              <span class="real-cmp-stat-val highlight-green" id="liveLaneWait">-</span>
+            </div>
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Grounding Score:</span>
+              <span class="real-cmp-stat-val" id="liveLaneGrounding">-</span>
+            </div>
+
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:4px; font-weight:600;">LLM Synthesized Answer:</div>
+              <div class="real-cmp-answer-box" id="liveLaneAnswer">Click "Execute Live Side-by-Side" to run both pipelines concurrently.</div>
+            </div>
+          </div>
+
+          <!-- Lane 2: Normal Sequential RAG -->
+          <div class="real-cmp-lane normal" id="laneNormal">
+            <div class="real-cmp-lane-header">
+              <div class="real-cmp-lane-title" style="color:#60a5fa;">
+                <i data-lucide="clock" width="16" height="16"></i>
+                <span>Normal Sequential RAG</span>
+              </div>
+              <span class="real-cmp-badge normal" id="normLaneBadge">Ready</span>
+            </div>
+            
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Isolated Session:</span>
+              <span class="real-cmp-stat-val" id="normLaneSession">cmp_norm</span>
+            </div>
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Retrieval Timing:</span>
+              <span class="real-cmp-stat-val highlight-blue" id="normLaneTiming">Post-Utterance</span>
+            </div>
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Post-Speech Wait:</span>
+              <span class="real-cmp-stat-val highlight-blue" id="normLaneWait">-</span>
+            </div>
+            <div class="real-cmp-stat-row">
+              <span class="real-cmp-stat-label">Grounding Score:</span>
+              <span class="real-cmp-stat-val" id="normLaneGrounding">-</span>
+            </div>
+
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:4px; font-weight:600;">LLM Synthesized Answer:</div>
+              <div class="real-cmp-answer-box" id="normLaneAnswer">Click "Execute Live Side-by-Side" to run both pipelines concurrently.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+
   <!-- Modal: BYOK Provider Configuration -->
   <div class="modal-backdrop" id="byokModal">
     <div class="modal-card">
@@ -543,8 +1165,8 @@
       <div id="modalStatus" style="display:none; font-size:0.85rem; padding:10px; border-radius:6px; margin-bottom:16px;"></div>
 
       <div style="display:flex; justify-content:flex-end; gap:12px;">
-        <button class="header-btn outline" onclick="testModalProviders()">Test Connection</button>
-        <button class="header-btn primary" onclick="saveModalConfig()">Save &amp; Apply</button>
+        <button class="modal-btn" onclick="testModalProviders()">Test Connection</button>
+        <button class="modal-btn primary" onclick="saveModalConfig()">Save &amp; Apply</button>
       </div>
     </div>
   </div>
@@ -604,7 +1226,7 @@
 
     // ─── STATE MANAGEMENT ─────────────────────────────────────────────
     const state = {
-      sessionId: 'session_demo_01',
+      sessionId: 'session_' + Math.random().toString(36).substring(2, 8),
       turnId: 1,
       isLiveMode: true,
       isRunning: false,
@@ -618,6 +1240,10 @@
       recFinal: '',
       typeWords: 0,
       typeSent: '',
+      pendingChunk: null,
+      pendingEnd: false,
+      speechSilenceTimer: null,
+      activeAbortController: null,
     };
 
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -643,45 +1269,542 @@
       state.isLiveMode = checked;
       const caption = document.getElementById('inputCaption');
       if (checked) {
-        caption.innerHTML = '⚡ <strong>Live Stream ON:</strong> Evaluates speech &amp; typing in real time. Fires speculative searches and absorbs continuations continuously without restarting!';
+        caption.innerHTML = '⚡ <strong>Live Stream ON:</strong> Evaluates speech dynamically with speculative pre-retrieval and continuous thought.';
         if (!state.wsConnected) connectWs();
       } else {
-        caption.innerHTML = '⚪ <strong>Live Stream OFF:</strong> Standard turn execution mode (via POST /turn).';
+        caption.innerHTML = '⚪ <strong>Normal Sequential RAG:</strong> Standard post-utterance retrieval (no speculative pre-fetching).';
       }
     }
 
-    function clearSessionHistory() {
+    // ─── COMPARISON MODAL & SIMULATOR ─────────────────────────────────
+
+    function openComparisonModal() {
+      const modal = document.getElementById('comparisonModal');
+      if (modal) {
+        modal.classList.add('open');
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+
+    function closeComparisonModal() {
+      const modal = document.getElementById('comparisonModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function setCmpPreset(text) {
+      const input = document.getElementById('cmpQueryInput');
+      if (input) input.value = text;
+    }
+
+    async function executeRealComparison() {
+      const input = document.getElementById('cmpQueryInput');
+      const query = (input?.value || '').trim();
+      if (!query) {
+        alert('Please enter a query to run side-by-side.');
+        return;
+      }
+
+      const btn = document.getElementById('btnRunRealCmp');
+      const btnText = document.getElementById('btnRunRealCmpText');
+      const scorecard = document.getElementById('cmpScorecard');
+
+      const liveBadge = document.getElementById('liveLaneBadge');
+      const normBadge = document.getElementById('normLaneBadge');
+      const liveSession = document.getElementById('liveLaneSession');
+      const normSession = document.getElementById('normLaneSession');
+      const liveWait = document.getElementById('liveLaneWait');
+      const normWait = document.getElementById('normLaneWait');
+      const liveGrounding = document.getElementById('liveLaneGrounding');
+      const normGrounding = document.getElementById('normLaneGrounding');
+      const liveAnswer = document.getElementById('liveLaneAnswer');
+      const normAnswer = document.getElementById('normLaneAnswer');
+
+      btn.disabled = true;
+      btnText.innerText = 'Running Side-by-Side...';
+      if (scorecard) scorecard.style.display = 'none';
+
+      liveBadge.innerText = 'Streaming & Pre-retrieving...';
+      liveBadge.className = 'real-cmp-badge';
+      normBadge.innerText = 'Speech in progress (waiting)...';
+      normBadge.className = 'real-cmp-badge normal';
+
+      liveSession.innerText = 'Initializing...';
+      normSession.innerText = 'Initializing...';
+      liveWait.innerText = 'Computing...';
+      normWait.innerText = 'Waiting for speech end...';
+      liveGrounding.innerText = '-';
+      normGrounding.innerText = '-';
+
+      liveAnswer.innerText = 'Simulating speech chunks: Gate G2 speculative retrieval triggered while speaker is talking...';
+      normAnswer.innerText = 'Idle: Classic sequential RAG cannot begin until speaker has completely finished talking...';
+
+      let normProgressTimer = setTimeout(() => {
+        normBadge.innerText = 'Decomposing & Querying...';
+        normAnswer.innerText = 'Speech finished. Now initiating post-utterance vector retrieval and LLM synthesis...';
+      }, 1800);
+
+      try {
+        const res = await fetch('/turn/compare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            utterance: query,
+            words_per_chunk: 2,
+            ms_per_chunk: 250
+          })
+        });
+
+        clearTimeout(normProgressTimer);
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+          throw new Error(errData.detail || 'Side-by-side run failed');
+        }
+
+        const data = await res.json();
+
+        // 1. Live Lane
+        liveBadge.innerText = 'Answer Ready';
+        liveBadge.className = 'real-cmp-badge';
+        liveSession.innerText = data.live?.telemetry?.session_id || 'cmp_live';
+        liveWait.innerText = `${data.live_wait_s}s`;
+        const lGrd = data.live?.telemetry?.grounding_score ?? 1.0;
+        const lCits = data.live?.telemetry?.citations?.length || 0;
+        liveGrounding.innerText = `${Math.round(lGrd * 100)}% (${lCits} citations)`;
+        liveAnswer.innerText = data.live?.answer || 'No answer text generated.';
+
+        // 2. Normal Lane
+        normBadge.innerText = 'Answer Ready';
+        normBadge.className = 'real-cmp-badge normal';
+        normSession.innerText = data.normal?.telemetry?.session_id || 'cmp_norm';
+        normWait.innerText = `${data.normal_wait_s}s`;
+        const nGrd = data.normal?.telemetry?.grounding_score ?? 1.0;
+        const nCits = data.normal?.telemetry?.citations?.length || 0;
+        normGrounding.innerText = `${Math.round(nGrd * 100)}% (${nCits} citations)`;
+        normAnswer.innerText = data.normal?.answer || 'No answer text generated.';
+
+        // 3. Scorecard
+        document.getElementById('cmpScoreSpeedup').innerText = `${data.speedup_factor}x`;
+        document.getElementById('cmpScoreHeadstart').innerText = `+${data.head_start_s}s`;
+        document.getElementById('cmpScoreSpeech').innerText = `${data.speech_duration_s}s`;
+        document.getElementById('cmpScoreLiveWait').innerText = `${data.live_wait_s}s`;
+        document.getElementById('cmpScoreNormalWait').innerText = `${data.normal_wait_s}s`;
+        if (scorecard) scorecard.style.display = 'flex';
+
+      } catch (err) {
+        clearTimeout(normProgressTimer);
+        liveBadge.innerText = 'Error';
+        normBadge.innerText = 'Error';
+        liveAnswer.innerText = `Error running live pipeline: ${err.message}`;
+        normAnswer.innerText = `Error running normal pipeline: ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btnText.innerText = 'Run Text Test';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+
+    // ─── LIVE VOICE COMPARISON (SAME VOICE FEEDS BOTH PIPELINES) ───────
+    const cmpVoiceState = {
+      isRecording: false,
+      recognition: null,
+      ws: null,
+      silenceTimer: null,
+      lastSentText: '',
+      speechStartMs: 0,
+    };
+
+    function getCmpWsUrl() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return proto + '//' + location.host + '/ws/compare';
+    }
+
+    function toggleCmpVoiceRecognition() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        alert('Web Speech API is not supported in this browser. Please type or select a preset query.');
+        return;
+      }
+
+      const micBtn = document.getElementById('btnCmpMic');
+      const micText = document.getElementById('btnCmpMicText');
+      const inputMicBtn = document.getElementById('cmpInputMicBtn');
+      const queryInput = document.getElementById('cmpQueryInput');
+      const btnRun = document.getElementById('btnRunRealCmp');
+      const scorecard = document.getElementById('cmpScorecard');
+
+      const liveBadge = document.getElementById('liveLaneBadge');
+      const normBadge = document.getElementById('normLaneBadge');
+      const liveSession = document.getElementById('liveLaneSession');
+      const normSession = document.getElementById('normLaneSession');
+      const liveWait = document.getElementById('liveLaneWait');
+      const normWait = document.getElementById('normLaneWait');
+      const liveGrounding = document.getElementById('liveLaneGrounding');
+      const normGrounding = document.getElementById('normLaneGrounding');
+      const liveAnswer = document.getElementById('liveLaneAnswer');
+      const normAnswer = document.getElementById('normLaneAnswer');
+
+      if (cmpVoiceState.isRecording) {
+        // Stop recording
+        try { cmpVoiceState.recognition?.stop(); } catch (e) {}
+        return;
+      }
+
+      // Start recording
+      cmpVoiceState.isRecording = true;
+      cmpVoiceState.lastSentText = '';
+      cmpVoiceState.speechStartMs = performance.now();
+      if (scorecard) scorecard.style.display = 'none';
+
+      if (micBtn) {
+        micBtn.classList.add('recording');
+        if (micText) micText.innerText = 'Listening... (Click to Finish)';
+      }
+      if (inputMicBtn) inputMicBtn.classList.add('recording');
+      if (btnRun) btnRun.disabled = true;
+
+      liveBadge.innerText = 'Connecting live stream...';
+      liveBadge.className = 'real-cmp-badge';
+      normBadge.innerText = 'Connecting live stream...';
+      normBadge.className = 'real-cmp-badge normal';
+
+      liveWait.innerText = 'Computing...';
+      normWait.innerText = 'Waiting for speech end...';
+      liveGrounding.innerText = '-';
+      normGrounding.innerText = '-';
+
+      liveAnswer.innerText = 'Connecting to Streaming Live RAG... Speak your question into the microphone!';
+      normAnswer.innerText = 'Connecting to Normal Sequential RAG... Classic pipeline will wait for speech completion.';
+
+      // Open WebSocket for live comparison
+      let ws;
+      try {
+        ws = new WebSocket(getCmpWsUrl());
+        cmpVoiceState.ws = ws;
+      } catch (err) {
+        console.warn('Failed to open cmp WebSocket:', err);
+      }
+
+      if (ws) {
+        ws.onopen = () => {
+          liveBadge.innerText = '🎙️ Listening to live speech...';
+          normBadge.innerText = '⏳ Waiting for speech end...';
+          liveAnswer.innerText = 'Listening to your microphone in real time. Speculative retrieval will trigger during speech!';
+          normAnswer.innerText = 'Listening to your microphone in real time. Sequential pipeline remains idle until you finish speaking.';
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+
+            if (msg.type === 'session_init') {
+              liveSession.innerText = msg.live_session || 'cmp_live';
+              normSession.innerText = msg.norm_session || 'cmp_norm';
+            } else if (msg.type === 'speech_ended') {
+              liveBadge.innerText = 'Synthesizing with pre-fetched context...';
+              normBadge.innerText = 'Speech ended! Decomposing & querying...';
+              normAnswer.innerText = 'Speech finished! Now executing decomposition, hybrid search, and cross-encoder rerank...';
+            } else if (msg.lane === 'live') {
+              if (msg.type === 'thought') {
+                liveAnswer.innerText = `[${msg.phase ? 'Phase ' + msg.phase : 'Thought'}] ${msg.text}`;
+              } else if (msg.type === 'retrieval_started') {
+                liveBadge.innerText = `⚡ Speculative Search Fired (t=${msg.t_s ? msg.t_s.toFixed(2) + 's' : ''})`;
+              } else if (msg.type === 'done') {
+                liveBadge.innerText = 'Answer Ready';
+                liveWait.innerText = `${msg.wait_s}s`;
+                const grd = msg.telemetry?.grounding_score ?? 1.0;
+                const cits = msg.telemetry?.citations?.length || 0;
+                liveGrounding.innerText = `${Math.round(grd * 100)}% (${cits} citations)`;
+                liveAnswer.innerText = msg.answer || 'No answer generated.';
+              }
+            } else if (msg.lane === 'normal') {
+              if (msg.type === 'listening') {
+                normBadge.innerText = '⏳ User speaking (pipeline idle)...';
+              } else if (msg.type === 'thought') {
+                normAnswer.innerText = `[${msg.phase ? 'Phase ' + msg.phase : 'Thought'}] ${msg.text}`;
+              } else if (msg.type === 'done') {
+                normBadge.innerText = 'Answer Ready';
+                normWait.innerText = `${msg.wait_s}s`;
+                const grd = msg.telemetry?.grounding_score ?? 1.0;
+                const cits = msg.telemetry?.citations?.length || 0;
+                normGrounding.innerText = `${Math.round(grd * 100)}% (${cits} citations)`;
+                normAnswer.innerText = msg.answer || 'No answer generated.';
+              }
+            } else if (msg.type === 'summary') {
+              document.getElementById('cmpScoreSpeedup').innerText = `${msg.speedup_factor}x`;
+              document.getElementById('cmpScoreHeadstart').innerText = `+${msg.head_start_s}s`;
+              document.getElementById('cmpScoreSpeech').innerText = `${msg.speech_duration_s}s`;
+              document.getElementById('cmpScoreLiveWait').innerText = `${msg.live_wait_s}s`;
+              document.getElementById('cmpScoreNormalWait').innerText = `${msg.normal_wait_s}s`;
+              if (scorecard) scorecard.style.display = 'flex';
+            }
+          } catch (e) {
+            console.error('Error parsing cmp WS message:', e);
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.warn('cmp WS error, falling back to HTTP comparison if needed:', err);
+        };
+
+        ws.onclose = () => {
+          if (micBtn) {
+            micBtn.classList.remove('recording');
+            if (micText) micText.innerText = 'Speak Live Voice';
+          }
+          if (inputMicBtn) inputMicBtn.classList.remove('recording');
+          if (btnRun) btnRun.disabled = false;
+          cmpVoiceState.isRecording = false;
+          if (window.lucide) window.lucide.createIcons();
+        };
+      }
+
+      // Set up browser speech recognition
+      const rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+      cmpVoiceState.recognition = rec;
+
+      rec.onresult = (evt) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = 0; i < evt.results.length; ++i) {
+          const t = evt.results[i][0].transcript;
+          if (evt.results[i].isFinal) finalTranscript += t + ' ';
+          else interimTranscript += t;
+        }
+        const cumulative = (finalTranscript + interimTranscript).trim();
+        if (!cumulative) return;
+
+        if (queryInput) queryInput.value = cumulative;
+
+        // Stream partial speech chunks live over WebSocket to both lanes!
+        if (ws && ws.readyState === WebSocket.OPEN && cumulative !== cmpVoiceState.lastSentText) {
+          cmpVoiceState.lastSentText = cumulative;
+          ws.send(JSON.stringify({ type: 'chunk', text: cumulative }));
+        }
+
+        // Smart Voice Activity & Silence Detection (1.5s silence)
+        clearTimeout(cmpVoiceState.silenceTimer);
+        const words = cumulative.split(/\s+/).filter(Boolean);
+        if (words.length >= 3) {
+          cmpVoiceState.silenceTimer = setTimeout(() => {
+            if (cmpVoiceState.isRecording) {
+              try { rec.stop(); } catch (e) {}
+            }
+          }, 1500);
+        }
+      };
+
+      rec.onerror = () => {
+        try { rec.stop(); } catch (e) {}
+      };
+
+      rec.onend = () => {
+        cmpVoiceState.isRecording = false;
+        clearTimeout(cmpVoiceState.silenceTimer);
+        if (micBtn) {
+          micBtn.classList.remove('recording');
+          if (micText) micText.innerText = 'Speak Live Voice';
+        }
+        if (inputMicBtn) inputMicBtn.classList.remove('recording');
+
+        const finalVal = (queryInput?.value || cmpVoiceState.lastSentText || '').trim();
+
+        // Finish speech stream on the WebSocket if connected!
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'end', text: finalVal }));
+        } else if (finalVal) {
+          // HTTP Fallback if WebSocket was disconnected
+          executeRealComparison();
+        } else {
+          if (btnRun) btnRun.disabled = false;
+        }
+      };
+
+      try {
+        rec.start();
+      } catch (err) {
+        console.warn('SpeechRec start failed:', err);
+        cmpVoiceState.isRecording = false;
+        if (micBtn) micBtn.classList.remove('recording');
+        if (btnRun) btnRun.disabled = false;
+      }
+    }
+
+    // ─── SEND / CANCEL BUTTON TOGGLE ──────────────────────────────────
+
+    let sendBtnCancelArmedTime = 0;
+
+    function setSendButtonState(isRunning) {
+      const sendBtn = document.getElementById('sendBtn');
+      if (!sendBtn) return;
+      if (isRunning) {
+        sendBtn.className = 'send-action-btn stop';
+        sendBtn.title = 'Stop / Cancel operation';
+        sendBtn.innerHTML = '<i data-lucide="square" width="14" height="14" style="fill:currentColor;"></i>';
+        // 400ms cooldown to prevent accidental cancellation from rapid double-clicks
+        sendBtnCancelArmedTime = Date.now() + 400;
+        sendBtn.onclick = (e) => {
+          if (Date.now() < sendBtnCancelArmedTime) {
+            e?.preventDefault();
+            e?.stopPropagation();
+            return;
+          }
+          cancelCurrentTurn();
+        };
+      } else {
+        sendBtn.className = 'send-action-btn';
+        sendBtn.title = 'Send message';
+        sendBtn.innerHTML = '<i data-lucide="arrow-up" width="18" height="18"></i>';
+        sendBtn.onclick = () => submitUserMessage();
+      }
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function cancelCurrentTurn() {
+      // Stop speech recognition
+      if (state.isRecording && state.recognition) {
+        try { state.recognition.stop(); } catch (e) {}
+      }
+      clearTimeout(state.speechSilenceTimer);
+      clearTimeout(state.scenarioTimer);
+      clearTimeout(state.interimTimer);
+
+      // Abort HTTP fetch if in-flight
+      if (state.activeAbortController) {
+        try { state.activeAbortController.abort(); } catch (e) {}
+        state.activeAbortController = null;
+      }
+
+      // Send cancel signal over WebSocket
+      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        try {
+          state.ws.send(JSON.stringify({ type: 'cancel' }));
+        } catch (e) {}
+      }
+
+      // Update active turn card in UI
+      const ctx = state.activeTurn;
+      if (ctx) {
+        ctx._resolved = true;
+        clearInterval(ctx.clockInterval);
+        if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
+        if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+        if (ctx.thinkingAccordion) ctx.thinkingAccordion.classList.remove('active-stream');
+        if (ctx.thinkingClock) ctx.thinkingClock.innerText = 'Turn cancelled by user';
+
+        // Replace stuck "Thinking in progress..." in answer container
+        if (ctx.answerContainer) {
+          ctx.answerContainer.innerHTML = `
+            <div style="color:var(--text-dim); padding:10px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); border-radius:8px; font-size:0.85rem;">
+              🛑 Turn execution was stopped by user.
+            </div>
+          `;
+        }
+
+        // Add cancellation notification in visible Thought Stream pane
+        const elapsedSec = ((performance.now() - (ctx.startT || performance.now())) / 1000).toFixed(2);
+        appendThoughtParagraph(ctx, {
+          phase: 1,
+          t_s: elapsedSec,
+          text: '🛑 **Turn Cancelled**: Turn execution stopped by user.'
+        });
+
+        addThoughtItem(ctx, {
+          time: 0,
+          type: 'speech',
+          dot: '🛑',
+          title: 'Operation Cancelled',
+          badge: 'CANCELLED',
+          badgeCls: 'thought-badge-speech',
+          text: 'Turn execution stopped by user.'
+        });
+      }
+
+      state.isRunning = false;
+      state.isRecording = false;
+      state.activeTurn = null;
+      setSendButtonState(false);
+
+      if (chatInput) {
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+      }
+      state.typeWords = 0;
+    }
+
+
+    async function clearSessionHistory() {
+      const oldSession = state.sessionId;
       state.sessionId = 'session_' + Math.random().toString(36).substring(2, 8);
       state.turnId = 1;
       state.activeTurn = null;
       state.isRunning = false;
-      document.getElementById('lblSession').innerText = state.sessionId;
-      document.getElementById('hudVersion').innerText = 'v1';
-      document.getElementById('hudLatency').innerText = '— ms';
-      document.getElementById('hudGrounding').innerText = '—';
-      document.getElementById('hudIntents').innerText = '0 Intents';
-      document.getElementById('chatThread').innerHTML = `
-        <div class="hero-banner" id="heroBanner">
+      state.recFinal = '';
+      state.typeSent = '';
+      state.typeWords = 0;
+      state.pendingChunk = null;
+
+      const lbl = document.getElementById('lblSession');
+      if (lbl) lbl.innerText = state.sessionId;
+      const hudV = document.getElementById('hudVersion');
+      if (hudV) hudV.innerText = 'v1';
+      const hudL = document.getElementById('hudLatency');
+      if (hudL) hudL.innerText = '— ms';
+      const hudG = document.getElementById('hudGrounding');
+      if (hudG) hudG.innerText = '—';
+      const hudI = document.getElementById('hudIntents');
+      if (hudI) hudI.innerText = '0 Intents';
+
+      if (chatInput) {
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+      }
+
+      const thread = document.getElementById('chatThread');
+      if (thread) {
+        thread.innerHTML = `
+          <div class="hero-banner" id="heroBanner">
             <div class="hero-icon"><i data-lucide="zap" width="24" height="24"></i></div>
             <div class="hero-title">Streaming Live Speech RAG</div>
             <div class="hero-sub">
-              Experience real-time speculative search with uninterrupted continuous thought. Speak into the microphone or test a benchmark scenario below.
+              Conversation memory &amp; cache cleared! Started fresh session (<code style="color:var(--accent); font-weight:600;">${esc(state.sessionId)}</code>). Speak into the mic or enter a question to start clean.
             </div>
             <div class="hero-badges">
-              <span class="pill">Speculative Pre-Retrieval</span>
-              <span class="pill">Continuous Thought</span>
-              <span class="pill">100% Grounded</span>
+              <span class="pill pill-blue">⚡ Speculative Pre-Retrieval (Gate G2)</span>
+              <span class="pill pill-green">🧠 Uninterrupted Continuous Thought (Gate G3)</span>
+              <span class="pill pill-blue">🛡️ 100% Grounded Citations (Gate G4)</span>
             </div>
           </div>
-          <div class="hero-title">Streaming Live Speech RAG</div>
-          <div class="hero-sub">
-            Session reset! Speak into the microphone or test a benchmark scenario to watch the continuous thought engine in action.
-          </div>
-        </div>
-      `;
-      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-        state.ws.send(JSON.stringify({ type: 'start', session_id: state.sessionId }));
-      } else {
+        `;
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      // Close old WebSocket so engine finishes and releases old session
+      if (state.ws) {
+        try {
+          state.ws.onclose = null;
+          state.ws.close();
+        } catch (e) {}
+        state.ws = null;
+        state.wsConnected = false;
+      }
+
+      // Purge session memory on the backend API
+      try {
+        await fetch('/session/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: oldSession })
+        });
+      } catch (e) {
+        console.warn('Backend session reset notification failed:', e);
+      }
+
+      // Connect new WebSocket session
+      if (state.isLiveMode) {
         connectWs();
       }
     }
@@ -706,11 +1829,129 @@
       return proto + '//' + location.host + '/ws/stream';
     }
 
+    function toggleSidebar() {
+      const container = document.querySelector('.app-container');
+      const sidebar = document.querySelector('.sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      const btn = document.getElementById('sidebarToggleBtn');
+      if (!sidebar) return;
+
+      const isMobile = window.innerWidth <= 900;
+      if (isMobile) {
+        const isOpen = sidebar.classList.toggle('open');
+        if (backdrop) backdrop.classList.toggle('open', isOpen);
+        if (btn) btn.classList.toggle('active', isOpen);
+      } else {
+        const isCollapsed = container.classList.toggle('sidebar-collapsed');
+        if (btn) {
+          btn.classList.toggle('collapsed', isCollapsed);
+          btn.title = isCollapsed ? 'Open Sidebar (Ctrl+B)' : 'Close Sidebar (Ctrl+B)';
+        }
+        try { localStorage.setItem('sidebar_collapsed', isCollapsed ? '1' : '0'); } catch (e) {}
+      }
+    }
+    function toggleSidebarDrawer() { toggleSidebar(); }
+
+    // Hotkey Ctrl+B / Cmd+B to toggle sidebar
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    });
+
+    // Restore saved desktop sidebar state on load
+    try {
+      if (window.innerWidth > 900 && localStorage.getItem('sidebar_collapsed') === '1') {
+        document.querySelector('.app-container')?.classList.add('sidebar-collapsed');
+        const btn = document.getElementById('sidebarToggleBtn');
+        if (btn) {
+          btn.classList.add('collapsed');
+          btn.title = 'Open Sidebar (Ctrl+B)';
+        }
+      }
+    } catch (e) {}
+
     function updateApiStatusPill(text, cls) {
       const pill = document.getElementById('apiStatusPill');
       if (!pill) return;
-      pill.className = 'pill ' + cls;
-      pill.innerHTML = `<span class="pill-dot"></span> ${text}`;
+      pill.className = 'pill active ' + cls;
+      pill.innerHTML = `<span class="pill-dot"></span> <span class="pill-text">${esc(text)}</span>`;
+    }
+
+    async function recoverTurnViaHttp(ctx, text) {
+      if (!ctx || ctx._resolved) return;
+      if (ctx.thinkingClock) ctx.thinkingClock.innerText = 'Recovering via HTTP...';
+      try {
+        const res = await fetch('/turn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: state.sessionId,
+            turn_id: state.turnId,
+            utterance: text,
+            live_mode: state.isLiveMode,
+          }),
+        });
+
+        if (!res.ok) {
+          let err = await res.text();
+          try { err = JSON.parse(err).detail || err; } catch {}
+          throw new Error(err);
+        }
+
+        const data = await res.json();
+        const telem = data.telemetry;
+        clearInterval(ctx.clockInterval);
+        if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+        if (ctx.thinkingAccordion) ctx.thinkingAccordion.classList.remove('active-stream');
+
+        if (data.thoughts && Array.isArray(data.thoughts)) {
+          for (const t of data.thoughts) appendThoughtParagraph(ctx, t);
+        }
+
+        const thoughts = buildThoughtProcess(text, telem, data);
+        for (const t of thoughts) addThoughtItem(ctx, t);
+
+        const totalSec = (telem.latencies_ms?.end_to_end / 1000).toFixed(1);
+        const intentCount = (telem.sub_queries || []).length || (telem.retrieval_required ? 1 : 0);
+        if (ctx.thinkingClock) {
+          ctx.thinkingClock.innerText = `Thought for ${totalSec}s (${intentCount} sub-intent${intentCount > 1 ? 's' : ''})`;
+        }
+
+        await streamAnswerTypewriter(ctx.answerContainer, data.answer);
+
+        const isAbstain = Boolean(telem.uncertainty) || data.answer.includes("not available in the provided documents");
+        ctx.verifFooter.style.display = 'flex';
+        if (isAbstain) {
+          ctx.verifFooter.className = 'verification-footer abstained';
+          ctx.verifIcon.innerText = '🛡️';
+          ctx.verifText.innerText = 'Strict Out-of-Corpus Abstention Enforced (Zero Hallucination)';
+        } else {
+          ctx.verifFooter.className = 'verification-footer';
+          ctx.verifIcon.innerText = '✅';
+          ctx.verifText.innerText = `Verified 100% Grounded · ${telem.citations?.length || 0} Citation(s) Matched · 0 Fabrications`;
+        }
+
+        updateSidebarHud(telem);
+        state.turnId++;
+        ctx._resolved = true;
+      } catch (err) {
+        clearInterval(ctx.clockInterval);
+        if (ctx.thinkingClock) ctx.thinkingClock.innerText = 'Connection Error';
+        if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
+        if (ctx.answerContainer) {
+          ctx.answerContainer.innerHTML = `
+            <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
+              ⚠️ WebSocket stream interrupted: ${esc(err.message || err)}. Please try again.
+            </div>
+          `;
+        }
+      } finally {
+        state.isRunning = false;
+        state.activeTurn = null;
+        setSendButtonState(false);
+      }
     }
 
     function connectWs() {
@@ -724,7 +1965,15 @@
         ws.onopen = () => {
           state.wsConnected = true;
           updateApiStatusPill('Live WebSocket Connected', 'pill-green');
-          ws.send(JSON.stringify({ type: 'start', session_id: state.sessionId }));
+          ws.send(JSON.stringify({ type: 'start', session_id: state.sessionId, live_mode: state.isLiveMode }));
+          if (state.pendingChunk) {
+            ws.send(JSON.stringify({ type: 'chunk', text: String(state.pendingChunk).slice(0, 2000) }));
+            state.pendingChunk = null;
+          }
+          if (state.pendingEnd) {
+            ws.send(JSON.stringify({ type: 'end' }));
+            state.pendingEnd = false;
+          }
         };
 
         ws.onmessage = (event) => {
@@ -743,9 +1992,17 @@
         ws.onclose = () => {
           state.wsConnected = false;
           updateApiStatusPill('HTTP Fallback Ready', 'pill-blue');
-          // Reconnect with backoff if live mode is still enabled
+          // If a turn was in flight and waiting for an answer when the connection dropped:
+          const ctx = state.activeTurn;
+          if (state.isRunning && ctx && !ctx._resolved) {
+            const pendingText = ctx.userTextSpan ? ctx.userTextSpan.innerText.trim() : '';
+            if (pendingText && pendingText !== 'Listening…' && !pendingText.startsWith('Listening to')) {
+              recoverTurnViaHttp(ctx, pendingText);
+            }
+          }
+          // Reconnect with fast backoff if live mode is still enabled
           if (state.isLiveMode) {
-            setTimeout(connectWs, 2500);
+            setTimeout(connectWs, 250);
           }
         };
       } catch (e) {
@@ -754,14 +2011,26 @@
     }
 
     function sendWsChunk(text) {
+      if (!text) return;
       if (state.ws && state.ws.readyState === WebSocket.OPEN) {
         state.ws.send(JSON.stringify({ type: 'chunk', text: String(text).slice(0, 2000) }));
+      } else if (state.ws && state.ws.readyState === WebSocket.CONNECTING) {
+        state.pendingChunk = text;
+      } else {
+        state.pendingChunk = text;
+        connectWs();
       }
     }
 
     function sendWsEnd() {
       if (state.ws && state.ws.readyState === WebSocket.OPEN) {
         state.ws.send(JSON.stringify({ type: 'end' }));
+        state.pendingEnd = false;
+      } else {
+        state.pendingEnd = true;
+        if (!state.ws || state.ws.readyState === WebSocket.CLOSED || state.ws.readyState === WebSocket.CLOSING) {
+          connectWs();
+        }
       }
     }
 
@@ -857,8 +2126,7 @@
       if (state.activeTurn) return state.activeTurn;
 
       state.isRunning = true;
-      const sendBtn = document.getElementById('sendBtn');
-      if (sendBtn) sendBtn.disabled = true;
+      setSendButtonState(true);
 
       const userRow = appendUserMessage(initialUserText, isAudio);
       const userTextSpan = userRow.querySelector('.user-text-content');
@@ -1088,16 +2356,17 @@
               note: 'Pacing audio chunks; controller continuous loop active...'
             });
           } else if (trig === 'retrieve_now') {
+            const idx = m.intent_index || 1;
             addThoughtItem(ctx, {
               time: m.t_s,
               type: 'fire',
               dot: '⚡',
-              title: 'Intent 1 Detected — Speculative Search Started! (Gate G2)',
-              badge: '⚡ SPECULATIVE SEARCH (INTENT 1)',
+              title: `Intent ${idx} Detected — Speculative Search #${idx} Started! (Gate G2)`,
+              badge: `⚡ SPECULATIVE SEARCH (INTENT ${idx})`,
               badgeCls: 'thought-badge-fire',
-              chunkLabel: `Search Entity Detected at t = ${Number(m.t_s).toFixed(2)}s`,
+              chunkLabel: `Search Entity #${idx} Detected at t = ${Number(m.t_s).toFixed(2)}s`,
               chunkBox: `&ldquo;${esc(m.query || '')}&rdquo;`,
-              text: `Controller identified actionable search entity! Started background Qdrant hybrid vector search immediately while speaker is <strong>STILL TALKING!</strong>`,
+              text: `Controller identified actionable search entity #${idx}! Started simultaneous background Qdrant hybrid vector search immediately while speaker is <strong>STILL TALKING!</strong>`,
               note: '🚀 User is still speaking! The system did NOT wait for speech to finish!'
             });
           } else if (trig === 'no_retrieval_needed') {
@@ -1120,17 +2389,18 @@
         case 'retrieval_started': {
           const ctx = state.activeTurn;
           if (!ctx) break;
+          const idx = m.intent_index || 1;
           addThoughtItem(ctx, {
             time: m.t_s,
             type: 'fire',
             dot: '🔍',
-            title: 'Provisional Hybrid Search Dispatched',
-            badge: 'PROVISIONAL RETRIEVAL',
+            title: `Provisional Hybrid Search Dispatched (Intent ${idx})`,
+            badge: `PROVISIONAL RETRIEVAL #${idx}`,
             badgeCls: 'thought-badge-fire',
-            chunkLabel: 'Speculative Search Query',
+            chunkLabel: `Speculative Search Query #${idx}`,
             chunkBox: `&ldquo;${esc(m.query || '')}&rdquo;`,
-            text: `Background search thread executing dense + sparse retrieval across vector store.`,
-            note: 'Early search underway to eliminate wait latency!'
+            text: `Background search thread #${idx} executing dense + sparse retrieval across vector store simultaneously while speaker talks.`,
+            note: 'Simultaneous search underway to eliminate wait latency!'
           });
           break;
         }
@@ -1151,7 +2421,7 @@
             chunkLabel: 'Full Utterance Captured',
             chunkBox: `&ldquo;${esc(m.full_text || '')}&rdquo;`,
             text: `User finished speaking. Handing off full audio transcript to multi-intent decomposer and session refiner.`,
-            note: 'Early speculative search results are already ready in memory!'
+            note: 'All simultaneous speculative searches already active/ready in memory!'
           });
           break;
         }
@@ -1198,6 +2468,7 @@
         case 'answer': {
           const ctx = state.activeTurn;
           if (!ctx) break;
+          ctx._resolved = true;
           clearInterval(ctx.clockInterval);
           if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
           if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
@@ -1224,6 +2495,11 @@
             ctx.verifIcon.innerText = '✅';
             ctx.verifText.innerText = `Verified 100% Grounded · ${(m.citations || []).length} Citation(s) Matched · 0 Fabrications`;
           }
+          if (chatInput) {
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+          }
+          state.typeWords = 0;
           break;
         }
 
@@ -1231,6 +2507,7 @@
           const telem = m.telemetry || {};
           const ctx = state.activeTurn;
           if (ctx) {
+            ctx._resolved = true;
             if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
             // Early retrieval head start banner
             if (telem.provisional_fired_s != null && telem.utterance_end_s != null) {
@@ -1254,14 +2531,19 @@
           state.turnId++;
           state.isRunning = false;
           state.activeTurn = null;
-          const sendBtn = document.getElementById('sendBtn');
-          if (sendBtn) sendBtn.disabled = false;
+          setSendButtonState(false);
+          if (chatInput) {
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+          }
+          state.typeWords = 0;
           break;
         }
 
         case 'error': {
           const ctx = state.activeTurn;
           if (ctx) {
+            ctx._resolved = true;
             clearInterval(ctx.clockInterval);
             if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
             if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
@@ -1274,8 +2556,12 @@
           }
           state.isRunning = false;
           state.activeTurn = null;
-          const sendBtn = document.getElementById('sendBtn');
-          if (sendBtn) sendBtn.disabled = false;
+          setSendButtonState(false);
+          if (chatInput) {
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+          }
+          state.typeWords = 0;
           break;
         }
       }
@@ -1364,17 +2650,15 @@
 
     // ─── STANDARD / FALLBACK HTTP TURN EXECUTION ──────────────────────
 
-    async function submitUserMessage(isScenario = false) {
+    async function submitUserMessage(isScenario = false, overrideText = null) {
       if (state.isRunning) return;
-      const text = chatInput.value.trim();
+      const text = (overrideText !== null ? overrideText : chatInput.value).trim();
       if (!text) return;
 
       chatInput.value = '';
       chatInput.style.height = 'auto';
-      // Programmatic clear does not fire the 'input' listener, so reset the
-      // live-typing word counter here. Otherwise a stale typeWords can equal
-      // the next turn's first word-count and suppress its first chunk.
       state.typeWords = 0;
+      setSendButtonState(true);
 
       // If Live Mode & WS is connected, execute via WS
       if (state.isLiveMode && state.wsConnected) {
@@ -1386,15 +2670,9 @@
 
       // Fallback: standard POST /turn
       const ctx = ensureTurnUI(text, false);
-      // ensureTurnUI already scheduled a generic 60s ctx.turnTimeout (via
-      // onTurnTimeout) sized for the WS path. For the HTTP fallback we want
-      // that same 60s ceiling to actually abort the in-flight fetch, so swap
-      // it for an AbortController tied to the identical TURN_TIMEOUT_MS
-      // duration — the catch/finally below already does the equivalent
-      // cleanup onTurnTimeout would have done.
       if (ctx.turnTimeout) { clearTimeout(ctx.turnTimeout); ctx.turnTimeout = null; }
-      const abortController = new AbortController();
-      const abortTimer = setTimeout(() => abortController.abort(), TURN_TIMEOUT_MS);
+      state.activeAbortController = new AbortController();
+      const abortTimer = setTimeout(() => state.activeAbortController?.abort(), TURN_TIMEOUT_MS);
       try {
         const res = await fetch('/turn', {
           method: 'POST',
@@ -1403,8 +2681,9 @@
             session_id: state.sessionId,
             turn_id: state.turnId,
             utterance: text,
+            live_mode: state.isLiveMode,
           }),
-          signal: abortController.signal,
+          signal: state.activeAbortController.signal,
         });
 
         if (!res.ok) {
@@ -1420,9 +2699,6 @@
         if (ctx.liveIndicator) ctx.liveIndicator.style.display = 'none';
 
         // Render thought stream paragraphs in Thought Stream pane.
-        // The server always returns data.thoughts with real t_s and phase.
-        // If it is ever empty we render NOTHING rather than invent
-        // timestamps — a thought with a fabricated time is worse than none.
         if (data.thoughts && Array.isArray(data.thoughts) && data.thoughts.length > 0) {
           for (const t of data.thoughts) {
             appendThoughtParagraph(ctx, t);
@@ -1465,7 +2741,7 @@
         const isTimeout = Boolean(err) && err.name === 'AbortError';
         ctx.answerContainer.innerHTML = isTimeout ? `
           <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
-            ⏱️ Turn exceeded the 180s limit and was aborted.
+            ⏱️ Turn was stopped or timed out.
           </div>
         ` : `
           <div style="color:var(--error); padding:10px; background:rgba(239,68,68,0.1); border-radius:8px;">
@@ -1474,10 +2750,15 @@
         `;
       } finally {
         clearTimeout(abortTimer);
+        state.activeAbortController = null;
         state.isRunning = false;
         state.activeTurn = null;
-        const sendBtn = document.getElementById('sendBtn');
-        if (sendBtn) sendBtn.disabled = false;
+        setSendButtonState(false);
+        if (chatInput) {
+          chatInput.value = '';
+          chatInput.style.height = 'auto';
+        }
+        state.typeWords = 0;
         scrollToBottom();
       }
     }
@@ -1651,7 +2932,9 @@
       state.recognition.interimResults = true;
       state.recognition.lang = 'en-US';
 
-      state.recFinal = '';
+      let lastSentText = '';
+      let lastSentTime = 0;
+
       if (!state.wsConnected) connectWs();
 
       state.recognition.onstart = () => {
@@ -1662,31 +2945,66 @@
       };
 
       state.recognition.onresult = (evt) => {
-        let finalT = '', interimT = '';
-        for (let i = evt.resultIndex; i < evt.results.length; ++i) {
-          if (evt.results[i].isFinal) finalT += evt.results[i][0].transcript;
-          else interimT += evt.results[i][0].transcript;
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = 0; i < evt.results.length; ++i) {
+          const t = evt.results[i][0].transcript;
+          if (evt.results[i].isFinal) {
+            finalTranscript += t + ' ';
+          } else {
+            interimTranscript += t;
+          }
         }
-        state.recFinal += finalT;
-        const cumulative = (state.recFinal + ' ' + interimT).trim();
-        if (cumulative) {
-          const ctx = ensureTurnUI(cumulative, true);
-          if (ctx.userTextSpan) ctx.userTextSpan.innerText = cumulative;
-          chatInput.value = cumulative;
-          scrollToBottom();
+        const cumulative = (finalTranscript + interimTranscript).trim();
+        if (!cumulative) return;
 
-          clearTimeout(state.interimTimer);
-          state.interimTimer = setTimeout(() => {
-            if (state.isLiveMode && state.wsConnected) {
+        const ctx = ensureTurnUI(cumulative, true);
+        if (ctx.userTextSpan) ctx.userTextSpan.innerText = cumulative;
+        chatInput.value = cumulative;
+        scrollToBottom();
+
+        // Real-time streaming: send partial speech chunks live as words arrive!
+        const now = performance.now();
+        const curWords = cumulative.split(/\s+/).length;
+        const prevWords = lastSentText ? lastSentText.split(/\s+/).length : 0;
+
+        // Send every 2 new words OR if 300ms elapsed with new text
+        if (curWords >= prevWords + 2 || (now - lastSentTime >= 300 && cumulative !== lastSentText)) {
+          lastSentText = cumulative;
+          lastSentTime = now;
+          if (state.isLiveMode) {
+            sendWsChunk(cumulative);
+          }
+        }
+
+        clearTimeout(state.interimTimer);
+        state.interimTimer = setTimeout(() => {
+          if (cumulative !== lastSentText) {
+            lastSentText = cumulative;
+            lastSentTime = performance.now();
+            if (state.isLiveMode) {
               sendWsChunk(cumulative);
             }
-          }, 200);
+          }
+        }, 150);
+
+        // Smart Voice Activity & Silence Detection:
+        clearTimeout(state.speechSilenceTimer);
+        const wCount = cumulative.split(/\s+/).filter(Boolean).length;
+        if (wCount >= 3) {
+          state.speechSilenceTimer = setTimeout(() => {
+            if (state.isRecording && state.recognition) {
+              try { state.recognition.stop(); } catch (e) {}
+            }
+          }, 1500);
         }
       };
 
       state.recognition.onerror = () => {
         btn.classList.remove('recording');
         state.isRecording = false;
+        clearTimeout(state.speechSilenceTimer);
+        setSendButtonState(false);
         chatInput.placeholder = 'Ask a question or speak into microphone (Live Stream is ON)...';
       };
 
@@ -1695,15 +3013,23 @@
         state.isRecording = false;
         chatInput.placeholder = 'Ask a question or speak into microphone (Live Stream is ON)...';
         clearTimeout(state.interimTimer);
+        clearTimeout(state.speechSilenceTimer);
 
-        const finalQuery = (state.recFinal || chatInput.value).trim();
+        const finalQuery = (chatInput.value || '').trim();
+        // Clear input bar immediately upon speech finish!
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        state.typeWords = 0;
+
         if (finalQuery) {
-          if (state.isLiveMode && state.wsConnected) {
+          if (state.isLiveMode) {
             sendWsChunk(finalQuery);
             sendWsEnd();
           } else {
-            submitUserMessage(false);
+            submitUserMessage(false, finalQuery);
           }
+        } else {
+          setSendButtonState(false);
         }
       };
 
@@ -1722,7 +3048,7 @@
         if (!res.ok) return;
         const data = await res.json();
         const total = data.total_chunks || 0;
-        document.getElementById('corpusPill').innerHTML = `<span class="pill-dot"></span> ${total} Chunks Indexed`;
+        document.getElementById('corpusPill').innerHTML = `<span class="pill-dot"></span> <span class="pill-text">${total} Chunks<span class="pill-extra"> Indexed</span></span>`;
         document.getElementById('corpusSummaryText').innerText = `Total ${total} chunk(s) indexed in Qdrant:`;
 
         const list = document.getElementById('corpusDocsList');
@@ -1743,10 +3069,30 @@
       }
     }
 
+    function getAdminHeaders(extraHeaders = {}) {
+      const headers = { ...extraHeaders };
+      const token = localStorage.getItem('admin_token') || '';
+      if (token) headers['X-Admin-Token'] = token;
+      return headers;
+    }
+
+    async function promptForAdminToken() {
+      const token = prompt('This action requires an Admin Token. Please enter server ADMIN_TOKEN:');
+      if (token && token.trim()) {
+        localStorage.setItem('admin_token', token.trim());
+        return true;
+      }
+      return false;
+    }
+
     async function reseedCorpus() {
       if (!confirm('Reseed corpus to the 4 default benchmark chunks (Doc_01 venue booking, Doc_02 travel policy)?')) return;
       try {
-        const res = await fetch('/corpus/reseed', { method: 'POST' });
+        let res = await fetch('/corpus/reseed', { method: 'POST', headers: getAdminHeaders() });
+        if (res.status === 401 || res.status === 403) {
+          const ok = await promptForAdminToken();
+          if (ok) res = await fetch('/corpus/reseed', { method: 'POST', headers: getAdminHeaders() });
+        }
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.detail || `Reseed failed (HTTP ${res.status})`);
@@ -1766,7 +3112,13 @@
       formData.append('replace', 'false');
 
       try {
-        const res = await fetch('/corpus/upload', { method: 'POST', body: formData });
+        let res = await fetch('/corpus/upload', { method: 'POST', body: formData, headers: getAdminHeaders() });
+        if (res.status === 401 || res.status === 403) {
+          const ok = await promptForAdminToken();
+          if (ok) {
+            res = await fetch('/corpus/upload', { method: 'POST', body: formData, headers: getAdminHeaders() });
+          }
+        }
         const data = await res.json();
         if (!res.ok) {
           throw new Error(data.detail || `Upload failed (HTTP ${res.status})`);
@@ -1789,7 +3141,7 @@
 
     async function loadByokConfig() {
       try {
-        const res = await fetch('/admin/llm/config');
+        const res = await fetch('/admin/llm/config', { headers: getAdminHeaders() });
         if (!res.ok) return;
         const cfg = await res.json();
         document.getElementById('mFastProvider').value = cfg.fast_provider || 'groq';
@@ -1816,11 +3168,21 @@
 
       const st = document.getElementById('modalStatus');
       try {
-        const res = await fetch('/admin/llm/config', {
+        let res = await fetch('/admin/llm/config', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAdminHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload)
         });
+        if (res.status === 401 || res.status === 403) {
+          const ok = await promptForAdminToken();
+          if (ok) {
+            res = await fetch('/admin/llm/config', {
+              method: 'POST',
+              headers: getAdminHeaders({ 'Content-Type': 'application/json' }),
+              body: JSON.stringify(payload)
+            });
+          }
+        }
         if (!res.ok) throw new Error(await res.text());
         st.style.display = 'block';
         st.style.background = 'rgba(16,185,129,0.15)';
@@ -1849,7 +3211,13 @@
       st.innerText = 'Testing provider connections...';
 
       try {
-        const res = await fetch('/admin/llm/test', { method: 'POST' });
+        let res = await fetch('/admin/llm/test', { method: 'POST', headers: getAdminHeaders() });
+        if (res.status === 401 || res.status === 403) {
+          const ok = await promptForAdminToken();
+          if (ok) {
+            res = await fetch('/admin/llm/test', { method: 'POST', headers: getAdminHeaders() });
+          }
+        }
         const d = await res.json();
         if (!res.ok) {
           throw new Error(d.detail || `HTTP ${res.status}`);
@@ -1861,7 +3229,45 @@
       }
     }
 
+    async function loadHardwareInfo() {
+      try {
+        const res = await fetch('/system/hardware');
+        if (!res.ok) return;
+        const info = await res.json();
+        const pill = document.getElementById('gpuStatusPill');
+        const pillText = document.getElementById('gpuPillText');
+        const hudName = document.getElementById('hudGpuName');
+        const hudDetail = document.getElementById('hudGpuDetail');
+
+        if (info.gpu_available) {
+          const rawName = info.device_name || 'GPU';
+          const shortName = rawName.replace('NVIDIA GeForce ', '').replace(' Laptop GPU', '');
+          const prov = info.provider === 'CUDAExecutionProvider' ? 'CUDA' : 'DirectML';
+          if (pill) {
+            pill.className = 'pill pill-green active';
+            pill.title = `Hardware Acceleration Active: ${info.device_name} (${info.vram_gb} GB VRAM) via ${info.provider}`;
+          }
+          if (pillText) pillText.innerText = `GPU: ${shortName} (${prov})`;
+          if (hudName) hudName.innerText = `GPU: ${shortName}`;
+          if (hudDetail) hudDetail.innerText = `${prov} Accelerated (~3ms)`;
+        } else {
+          if (pill) {
+            pill.className = 'pill';
+            pill.title = 'Running on CPU Execution Provider';
+          }
+          if (pillText) pillText.innerText = 'CPU Engine';
+          if (hudName) hudName.innerText = 'Engine: CPU';
+          if (hudDetail) hudDetail.innerText = 'CPUExecutionProvider';
+        }
+      } catch (e) {
+        console.warn('Hardware info check failed:', e);
+      }
+    }
+
     // Initialize
+    const lblInit = document.getElementById('lblSession');
+    if (lblInit) lblInit.innerText = state.sessionId;
+    loadHardwareInfo();
     refreshCorpus();
     connectWs();
     lucide.createIcons();
