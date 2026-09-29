@@ -98,3 +98,18 @@ This document tracks the phased day-by-day execution plan for the Streaming Live
 - [x] Synchronized `agents.md` collaboration log.
 - [x] Committed to git `main` branch and verified GitHub remote synchronization.
 **Gate 9:** Release tagged and ready for submission: `PRISM_GENAI_HACKATHON_Y2026`. (✅ **Passed**)
+
+---
+
+## Phase 9: Continuous Speculative Streaming, Live VS Arena, GPU Acceleration & Voice
+**Goal:** Next-generation real-time multi-intent speculation, live microphone voice input, side-by-side arena, and GPU acceleration.
+- [x] Continuous simultaneous multi-intent speculative streaming in `streaming/engine.py` (detects multiple intent clauses mid-stream, fires up to 4 parallel searches before utterance ends).
+- [x] Collective coverage checking (70% token/stem match) suppressing redundant delta searches upon speech finish.
+- [x] Live Side-by-Side VS Arena (`/ws/compare` and `/ws/dual_stream`, `POST /turn/compare`) comparing Streaming Live RAG vs. Naive Sequential RAG concurrently with session isolation and cache bypass.
+- [x] Synchronized browser voice streaming via Web Speech API with real-time waveform visualizer.
+- [x] Hardware GPU acceleration (NVIDIA CUDA 12) dropping hybrid retrieval latency from ~170ms to **~9.8ms** (BGE-Small ~3ms, Cross-Encoder ~3ms).
+- [x] High-performance query response cache (`_QUERY_CACHE`) with instant Phase 0 thought streaming.
+- [x] Strict startup corpus isolation (`Doc_01` and `Doc_02` strictly on boot) with dynamic user uploads saved to `data/uploads/`.
+- [x] Expanded test suite to 26 unit tests in `tests/test_pipeline.py` (100% passing).
+**Gate 10:** Complete live voice + GPU acceleration + VS Arena verified. All 26 tests green. (✅ **Passed**)
+

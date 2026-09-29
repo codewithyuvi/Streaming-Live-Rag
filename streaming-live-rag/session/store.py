@@ -225,3 +225,9 @@ def reset_store():
         _sessions.clear()
         _sessions_last_access.clear()
         _session_locks.clear()
+    try:
+        from streaming.engine import clear_query_cache
+        clear_query_cache()
+    except Exception:
+        pass
+

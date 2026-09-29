@@ -64,12 +64,81 @@ def get_qdrant_client() -> QdrantClient:
     return _qdrant_client
 
 
+_gpu_info: dict | None = None
+
+
+def get_gpu_info() -> dict:
+    """
+    Auto-detects available GPU hardware (NVIDIA CUDA, DirectML, Apple MPS, ROCm).
+    Configures ONNX Runtime and PyTorch dynamic libraries so models seamlessly
+    bind to the GPU whenever available.
+    """
+    global _gpu_info
+    if _gpu_info is not None:
+        return _gpu_info
+
+    info = {
+        "gpu_available": False,
+        "device_name": "CPU",
+        "provider": "CPUExecutionProvider",
+        "vram_gb": 0.0,
+        "cuda_version": None,
+    }
+
+    # 1. Probe PyTorch CUDA & configure Windows DLL path if available
+    try:
+        import torch
+        if torch.cuda.is_available():
+            info["gpu_available"] = True
+            info["device_name"] = torch.cuda.get_device_name(0)
+            props = torch.cuda.get_device_properties(0)
+            info["vram_gb"] = round(props.total_memory / (1024**3), 2)
+            info["cuda_version"] = getattr(torch.version, "cuda", None)
+            torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
+            if hasattr(os, "add_dll_directory") and os.path.isdir(torch_lib):
+                try:
+                    os.add_dll_directory(torch_lib)
+                except Exception:
+                    pass
+            if torch_lib not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = torch_lib + os.pathsep + os.environ.get("PATH", "")
+    except Exception:
+        pass
+
+    # 2. Probe ONNX Runtime Execution Providers
+    try:
+        import onnxruntime as ort
+        available = ort.get_available_providers()
+        if "CUDAExecutionProvider" in available:
+            info["gpu_available"] = True
+            info["provider"] = "CUDAExecutionProvider"
+        elif "DmlExecutionProvider" in available:
+            info["gpu_available"] = True
+            info["provider"] = "DmlExecutionProvider"
+        elif "ROCMExecutionProvider" in available:
+            info["gpu_available"] = True
+            info["provider"] = "ROCMExecutionProvider"
+    except Exception:
+        pass
+
+    _gpu_info = info
+    return _gpu_info
+
+
 def get_embedding_model() -> TextEmbedding:
     global _embedding_model
     if _embedding_model is None:
         with _model_lock:
             if _embedding_model is None:
-                _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+                gpu = get_gpu_info()
+                use_cuda = gpu["gpu_available"] and gpu["provider"] == "CUDAExecutionProvider"
+                try:
+                    if use_cuda:
+                        _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5", cuda=True)
+                    else:
+                        _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+                except Exception:
+                    _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5", cuda=False)
     return _embedding_model
 
 
@@ -87,7 +156,15 @@ def get_reranker() -> TextCrossEncoder:
     if _reranker is None:
         with _model_lock:
             if _reranker is None:
-                _reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2")
+                gpu = get_gpu_info()
+                use_cuda = gpu["gpu_available"] and gpu["provider"] == "CUDAExecutionProvider"
+                try:
+                    if use_cuda:
+                        _reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2", cuda=True)
+                    else:
+                        _reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2")
+                except Exception:
+                    _reranker = TextCrossEncoder(model_name="Xenova/ms-marco-MiniLM-L-6-v2", cuda=False)
     return _reranker
 
 

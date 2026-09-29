@@ -79,7 +79,7 @@ def make_fake_deps(decide=None):
     )
 
 
-def run_turn(session_id, utterance, deps, wpc=2, mpc=30):
+def run_turn(session_id, utterance, deps, wpc=2, mpc=30, use_cache=None, live_mode=True):
     """Run one live turn; return (TurnResult, emitted events, sunk events)."""
     events, sunk = [], []
 
@@ -92,6 +92,8 @@ def run_turn(session_id, utterance, deps, wpc=2, mpc=30):
         deps=deps,
         emit_event=_collect,
         sink=sunk.append,
+        live_mode=live_mode,
+        use_cache=use_cache,
     ))
     return res, events, sunk
 
@@ -265,6 +267,48 @@ def test_engine_no_provisional_on_chitchat():
     assert not [e for e in t.retrieval_events if e.trigger == "provisional"]
 
 
+def test_engine_simultaneous_multi_intent_streaming():
+    """Verify that multiple distinct intents in a continuous stream trigger concurrent speculative retrievals."""
+    def _multi_decide(candidate):
+        c = candidate.lower()
+        if "segmentation" in c:
+            return {"trigger": "retrieve_now", "reason": "segmentation concept"}
+        if "divide" in c or "variable size" in c:
+            return {"trigger": "retrieve_now", "reason": "process division intent"}
+        if "paging" in c or "users view" in c:
+            return {"trigger": "retrieve_now", "reason": "paging comparison intent"}
+        return {"trigger": "wait", "reason": "intent incomplete"}
+
+    deps = make_fake_deps(decide=_multi_decide)
+    utterance = (
+        "what is segmentation explain how it divides a process into variable size segments "
+        "and why it is said to give the users view of the process while paging does not"
+    )
+    res, events, sunk = run_turn("pytest_engine_multi", utterance, deps, wpc=2, mpc=25)
+    t = res.telemetry
+
+    # Must have fired multiple speculative retrieval_started events before utterance_end
+    retrieval_started = [e for e in events if e.get("type") == "retrieval_started"]
+    assert len(retrieval_started) >= 2, (
+        f"Expected at least 2 simultaneous speculative retrievals, got {len(retrieval_started)}"
+    )
+
+    # Every speculative retrieval must have commenced strictly before speech finished
+    for rs in retrieval_started:
+        assert rs["t_s"] < t.utterance_end_s, (
+            f"Retrieval {rs} did not start before speech ended ({t.utterance_end_s})"
+        )
+
+    # Phase 2 thought must reflect simultaneous speculative retrievals
+    thought_events = [e for e in events if e.get("type") == "thought"]
+    phase2 = next(e for e in thought_events if e.get("phase") == 2)
+    assert "simultaneous speculative searches were executed during speech" in phase2["text"]
+
+    # Grounding & answer generated
+    assert res.answer
+    assert len(t.citations) > 0
+
+
 # ---------------------------------------------------------------------------
 # Merge: provisional evidence must survive the quota merge (starvation fix)
 # ---------------------------------------------------------------------------
@@ -349,6 +393,42 @@ def test_session_lifecycle():
     sess.commit("PRESENTATION_ONLY", "format as bullets", "ans3", ["Doc_01 §1"])
     assert sess.answer_version == 2
     assert len(sess.turns) == 3
+
+
+def test_session_reset_and_cache_clearing():
+    """Verify session memory is cleanly wiped on reset so subsequent queries start fresh."""
+    from session.store import delete_session
+    _stub_heavy_modules()
+    import api.main as api_main
+    from api.main import reset_session_endpoint, SessionResetRequest
+
+    reset_store()
+    sess = get_or_create_session("cache_test_sess")
+    sess.commit("NEW_TOPIC", "what is segmentation", "segmentation divides memory...", ["Doc_01 §1"])
+    assert sess.current_answer != ""
+    assert len(sess.turns) == 1
+
+    # Reset via endpoint with explicit session_id
+    res = reset_session_endpoint(session_id="cache_test_sess")
+    assert res["status"] == "cleared"
+    assert res["existed"] is True
+
+    # Check store has no residual memory for that session
+    fresh = get_or_create_session("cache_test_sess")
+    assert fresh.current_answer == ""
+    assert fresh.current_query == ""
+    assert len(fresh.turns) == 0
+    assert fresh.answer_version == 0
+
+    # Reset all sessions via request body
+    sess2 = get_or_create_session("another_sess")
+    sess2.commit("NEW_TOPIC", "query", "answer", [])
+    res2 = reset_session_endpoint(req=SessionResetRequest(session_id="another_sess"))
+    assert res2["status"] == "cleared"
+
+    res_all = reset_session_endpoint()
+    assert res_all["status"] == "cleared"
+    assert res_all.get("all") is True
 
 
 # ---------------------------------------------------------------------------
@@ -482,3 +562,108 @@ def test_ui_fetch_paths_exist_in_route_table():
     assert not orphans, (
         "index.html calls endpoints with no backend route (404s): "
         + ", ".join(orphans))
+
+
+def test_query_cache_hit_and_repeat_query():
+    """Verify query cache returns Phase 0 instant response on repeated queries."""
+    from streaming.engine import clear_query_cache, set_cached_response, get_cached_response
+    clear_query_cache()
+
+    synth_count = 0
+    def _synth(prompt):
+        nonlocal synth_count
+        synth_count += 1
+        return {
+            "text": "Segmentation divides memory into logical segments [Doc_01 §1].",
+            "input_tokens": 50, "output_tokens": 20,
+        }
+
+    deps = make_fake_deps()
+    deps.synthesize_fn = _synth
+
+    utterance = "I need to plan a workshop in Pune for 30 attendees"
+    res1, ev1, _ = run_turn("cache_sess_1", utterance, deps, use_cache=True)
+    assert synth_count == 1
+    assert any(e.get("phase") == 1 for e in ev1 if e.get("type") == "thought")
+
+    # Turn 2: Repeat the same question in the same session
+    res2, ev2, _ = run_turn("cache_sess_1", utterance, deps, use_cache=True)
+    assert synth_count == 1, "Cache hit should not trigger additional LLM synthesis"
+    assert res2.answer == res1.answer
+    assert any(e.get("phase") == 0 for e in ev2 if e.get("type") == "thought")
+    assert res2.telemetry.latencies_ms.retrieval == 0.0
+
+    clear_query_cache()
+    assert get_cached_response(utterance) is None
+
+
+@pytest.mark.anyio
+async def test_compare_endpoint_contract(monkeypatch):
+    """Verify handle_compare runs both pipelines concurrently, isolates sessions, and returns measured metrics."""
+    _stub_heavy_modules()
+    from unittest.mock import MagicMock
+    from fastapi import Request
+    import api.main as api_main
+    from api.main import CompareRequest, CompareResponse, handle_compare
+    from streaming.engine import TurnResult
+    from telemetry.schema import TelemetryEvent, LatenciesMs, TokenCost
+
+    captured_calls = []
+
+    async def _fake_run_live_turn(session_id, source, emit_event=None, live_mode=True, use_cache=True):
+        captured_calls.append({
+            "session_id": session_id,
+            "live_mode": live_mode,
+            "use_cache": use_cache,
+        })
+        # consume source chunks
+        async for _ in source:
+            pass
+        return TurnResult(
+            answer=f"Synthesized answer for {session_id} (live={live_mode})",
+            telemetry=TelemetryEvent(
+                session_id=session_id,
+                turn_id=1,
+                intent="NEW_TOPIC",
+                is_live_stream=live_mode,
+                live_chunks_received=3,
+                live_stream_duration_s=0.2,
+                provisional_fired_s=0.05 if live_mode else None,
+                utterance_end_s=0.2,
+                grounding_score=1.0,
+                citations=["Doc_01 §1"],
+                latencies_ms=LatenciesMs(),
+                token_cost=TokenCost(),
+            ),
+        )
+
+    monkeypatch.setattr(api_main, "run_live_turn", _fake_run_live_turn)
+
+    mock_req = MagicMock(spec=Request)
+    mock_req.client.host = "127.0.0.1"
+
+    cmp_req = CompareRequest(
+        utterance="What is the venue booking capacity and cancellation penalty in Pune?",
+        words_per_chunk=2,
+        ms_per_chunk=5,
+    )
+
+    res = await handle_compare(cmp_req, mock_req)
+    assert isinstance(res, CompareResponse)
+    assert res.utterance == cmp_req.utterance
+    assert "live" in res.live.telemetry.session_id
+    assert "norm" in res.normal.telemetry.session_id
+    assert res.live.telemetry.session_id != res.normal.telemetry.session_id
+    assert res.live.telemetry.provisional_fired_s is not None
+    assert res.normal.telemetry.provisional_fired_s is None
+    assert res.speech_duration_s > 0
+    assert res.speedup_factor > 0
+
+    # Ensure both runs strictly bypassed cache (use_cache=False)
+    assert len(captured_calls) == 2
+    assert captured_calls[0]["live_mode"] is True
+    assert captured_calls[1]["live_mode"] is False
+    for call in captured_calls:
+        assert call["use_cache"] is False, f"Expected use_cache=False, got {call}"
+
+

@@ -6,6 +6,7 @@ import time
 import threading
 import hmac
 import re
+import ipaddress
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -65,16 +66,40 @@ app.add_middleware(
 )
 
 
+def _is_loopback_or_docker(client_host: str) -> bool:
+    """
+    Checks if client_host is loopback, Docker bridge gateway, or internal container network.
+    When running containerized in Docker, requests originating from the host arrive
+    via the Docker bridge network gateway (e.g. 172.18.0.1 or 192.168.65.1).
+    """
+    if not client_host or client_host in ("127.0.0.1", "::1", "localhost", "testclient"):
+        return True
+    try:
+        ip = ipaddress.ip_address(client_host)
+        if ip.is_loopback:
+            return True
+        # Allow Docker bridge subnets and private host gateways (172.16.0.0/12, 192.168.0.0/16, 10.0.0.0/8)
+        if (
+            ip in ipaddress.ip_network("172.16.0.0/12")
+            or ip in ipaddress.ip_network("192.168.0.0/16")
+            or ip in ipaddress.ip_network("10.0.0.0/8")
+        ):
+            return True
+    except ValueError:
+        pass
+    return False
+
+
 def verify_admin_access(request: Request) -> bool:
     """
     Enforces access control on administrative and mutation endpoints (/config/*, /corpus/clear, /upload).
     - If ADMIN_TOKEN is set: requires matching token via X-Admin-Token or Authorization: Bearer.
       Verified using constant-time hmac.compare_digest to prevent timing attacks.
-    - If ADMIN_TOKEN is unset: strictly serves loopback only (127.0.0.1, ::1, localhost, testclient).
-      Non-loopback callers receive HTTP 403.
+    - If ADMIN_TOKEN is unset: strictly serves loopback and local Docker container environments.
+      External public callers receive HTTP 403.
     """
     client_host = request.client.host if request.client else ""
-    is_loopback = client_host in ("127.0.0.1", "::1", "localhost", "testclient")
+    is_loopback = _is_loopback_or_docker(client_host)
 
     if not ADMIN_TOKEN:
         if is_loopback:
@@ -156,17 +181,21 @@ def _check_rate_limit(session_id: str, client_ip: str = "127.0.0.1") -> bool:
 
 @app.on_event("startup")
 def _auto_seed_corpus_on_startup():
-    """Ensures dev_corpus documents are indexed on startup if the collection is empty or incomplete."""
+    """Ensures indexed corpus strictly contains ONLY Doc 1 and Doc 2 whenever server starts."""
     try:
-        from retrieval.ingest import parse_corpus, ingest_sections, get_corpus_summary
+        from retrieval.ingest import parse_corpus, ingest_sections, get_corpus_summary, clear_corpus
         summary = get_corpus_summary()
-        if summary.get("total_chunks", 0) < 4:
+        docs = summary.get("documents", [])
+        doc_ids = {d.get("doc_id") for d in docs}
+        # Whenever start: keep strictly Doc 1 and Doc 2 on the indexed corpus
+        if doc_ids != {"Doc_01", "Doc_02"} or summary.get("total_chunks", 0) != 4:
             corpus_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "dev_corpus"))
             if os.path.exists(corpus_dir):
-                chunks = parse_corpus(corpus_dir)
+                chunks = parse_corpus(corpus_dir, allowed_docs={"Doc_01", "Doc_02"})
                 if chunks:
+                    clear_corpus()
                     ingest_sections(chunks, reset=True)
-                    logger.info("Auto-seeded %d corpus chunks on startup into %s.", len(chunks), summary.get("collection"))
+                    logger.info("Startup: indexed strictly Doc 1 and Doc 2 (%d chunks) into corpus.", len(chunks))
     except Exception as e:
         logger.warning("Auto-seed on startup failed: %s", e)
 
@@ -183,6 +212,16 @@ def health_check(live: bool = False):
     return res
 
 
+@app.get("/system/hardware")
+def get_hardware_acceleration():
+    """Returns detected GPU hardware, execution provider, and acceleration status."""
+    try:
+        from retrieval.hybrid_search import get_gpu_info
+        return get_gpu_info()
+    except Exception as e:
+        return {"gpu_available": False, "device_name": "CPU", "provider": "CPUExecutionProvider", "error": str(e)}
+
+
 @app.get("/")
 @app.get("/demo")
 def demo_ui():
@@ -194,6 +233,7 @@ def demo_ui():
 
 
 @app.get("/corpus")
+@app.get("/documents/summary")
 def get_corpus():
     """Returns currently indexed documents, total chunks, and citation tags."""
     return get_corpus_summary()
@@ -209,12 +249,12 @@ def clear_all_corpus(_authorized: bool = Depends(verify_admin_access)):
 @app.post("/corpus/reset")
 @app.post("/corpus/reseed")
 def reset_to_dev_corpus(_authorized: bool = Depends(verify_admin_access)):
-    """Resets the vector collection and re-indexes the default dev_corpus documents (Admin authorized)."""
-    from retrieval.ingest import parse_corpus, ingest_sections
+    """Resets the vector collection and re-indexes strictly Doc 1 and Doc 2 (Admin authorized)."""
+    from retrieval.ingest import parse_corpus, ingest_sections, clear_corpus
     clear_corpus()
     corpus_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "dev_corpus"))
-    chunks = parse_corpus(corpus_dir)
-    res = ingest_sections(chunks, reset=False) if chunks else {"chunks_indexed": 0}
+    chunks = parse_corpus(corpus_dir, allowed_docs={"Doc_01", "Doc_02"})
+    res = ingest_sections(chunks, reset=True) if chunks else {"chunks_indexed": 0}
     return {
         "status": "reseeded",
         "chunks_indexed": res.get("chunks_indexed", len(chunks)),
@@ -340,11 +380,35 @@ async def test_providers(target: str = "both", _authorized: bool = Depends(verif
     return await asyncio.to_thread(test_llm_connection, target=target)
 
 
+class SessionResetRequest(BaseModel):
+    session_id: str | None = None
+
+
+@app.post("/session/reset")
+@app.post("/session/{session_id}/reset")
+@app.delete("/session/{session_id}")
+def reset_session_endpoint(session_id: str | None = None, req: SessionResetRequest | None = None):
+    """
+    Clears conversation memory, turn history, and fast query cache.
+    - If session_id is provided, deletes that specific session lineage.
+    - If no session_id is provided, clears all ephemeral sessions.
+    """
+    from session.store import delete_session, reset_store
+    from streaming.engine import clear_query_cache
+    clear_query_cache()
+    target = session_id or (req.session_id if req else None)
+    if target:
+        deleted = delete_session(target)
+        return {"status": "cleared" if deleted else "not_found", "session_id": target, "existed": deleted}
+    reset_store()
+    return {"status": "cleared", "all": True}
+
 
 class TurnRequest(BaseModel):
     session_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-]+$")
     turn_id: int = Field(..., ge=1, le=10000)
     utterance: str = Field(..., min_length=1, max_length=1000)
+    live_mode: bool = Field(default=True)
 
 
 class TurnResponse(BaseModel):
@@ -367,13 +431,7 @@ from streaming.engine import _same_intent  # noqa: F401,E402
 @app.post("/turn", response_model=TurnResponse)
 async def handle_turn(req: TurnRequest, request: Request):
     """
-    Replay ``req.utterance`` as a live stream.
-
-    Chunks are emitted with real pacing (see streaming/live_stream.py) and
-    every timestamp in the returned telemetry is measured with a wall clock:
-    the provisional retrieval genuinely fires while the "speech" is still
-    arriving. For truly live input (microphone / typing as you speak), use
-    the /ws/stream WebSocket instead.
+    Replay ``req.utterance`` as a live stream or execute standard sequential RAG.
     """
     client_ip = request.client.host if request.client else "unknown"
     if not _check_rate_limit(req.session_id, client_ip):
@@ -390,8 +448,11 @@ async def handle_turn(req: TurnRequest, request: Request):
                 if ev.get("type") == "thought":
                     replayed_thoughts.append(ev)
 
-            source = play_utterance(req.utterance, words_per_chunk=2, ms_per_chunk=300)
-            result = await run_live_turn(req.session_id, source, emit_event=_collect_thought)
+            if req.live_mode:
+                source = play_utterance(req.utterance, words_per_chunk=2, ms_per_chunk=300)
+            else:
+                source = play_utterance(req.utterance, words_per_chunk=len(req.utterance.split()) or 1, ms_per_chunk=0)
+            result = await run_live_turn(req.session_id, source, emit_event=_collect_thought, live_mode=req.live_mode)
         except (asyncio.TimeoutError, TimeoutError):
             raise HTTPException(status_code=504, detail="Turn timed out; please retry.")
         except HTTPException:
@@ -401,6 +462,274 @@ async def handle_turn(req: TurnRequest, request: Request):
             # Never leak provider internals / keys to API callers.
             raise HTTPException(status_code=502, detail="Turn failed: upstream provider unavailable")
         return TurnResponse(answer=result.answer, telemetry=result.telemetry, thoughts=replayed_thoughts)
+
+
+class CompareRequest(BaseModel):
+    utterance: str = Field(..., min_length=3, max_length=1000)
+    words_per_chunk: int = Field(default=2, ge=1, le=10)
+    ms_per_chunk: int = Field(default=250, ge=0, le=1000)
+
+
+class CompareResponse(BaseModel):
+    utterance: str
+    live: TurnResponse
+    normal: TurnResponse
+    speech_duration_s: float
+    live_wait_s: float
+    normal_wait_s: float
+    head_start_s: float
+    speedup_factor: float
+
+
+@app.post("/turn/compare", response_model=CompareResponse)
+async def handle_compare(req: CompareRequest, request: Request):
+    """
+    Executes an honest side-by-side run of Streaming Live RAG vs. Normal Sequential RAG
+    on the exact same utterance under identical system conditions.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    session_prefix = f"cmp_{int(time.time() * 1000) % 1000000}"
+    live_session = f"{session_prefix}_live"
+    norm_session = f"{session_prefix}_norm"
+
+    if not _check_rate_limit(live_session, client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded.",
+        )
+
+    words = req.utterance.strip().split()
+    total_words = len(words)
+    chunk_count = (total_words + req.words_per_chunk - 1) // req.words_per_chunk
+    simulated_speech_s = round((chunk_count * req.ms_per_chunk) / 1000.0, 2)
+
+    try:
+        # 1. Setup Live Turn (real streaming chunk pacing + speculative retrieval, distinct session, no cache)
+        live_thoughts: list[dict] = []
+        async def _collect_live(ev: dict):
+            if ev.get("type") == "thought":
+                live_thoughts.append(ev)
+
+        live_source = play_utterance(req.utterance, words_per_chunk=req.words_per_chunk, ms_per_chunk=req.ms_per_chunk)
+
+        async def _run_live():
+            t0_l = time.time()
+            res = await run_live_turn(live_session, live_source, emit_event=_collect_live, live_mode=True, use_cache=False)
+            t_total = time.time() - t0_l
+            return res, t_total
+
+        # 2. Setup Normal Sequential Turn (distinct session, no cache)
+        norm_thoughts: list[dict] = []
+        async def _collect_norm(ev: dict):
+            if ev.get("type") == "thought":
+                norm_thoughts.append(ev)
+
+        async def _run_norm():
+            # Mirror realistic speech timeline: normal pipeline only starts after user finishes speaking
+            if simulated_speech_s > 0:
+                await asyncio.sleep(simulated_speech_s)
+            t0_n = time.time()
+            norm_source = play_utterance(req.utterance, words_per_chunk=len(words) or 1, ms_per_chunk=0)
+            res = await run_live_turn(norm_session, norm_source, emit_event=_collect_norm, live_mode=False, use_cache=False)
+            t_wait = time.time() - t0_n
+            return res, t_wait
+
+        # Run both pipelines simultaneously side-by-side!
+        (live_res, live_total_s), (norm_res, normal_wait_s) = await asyncio.gather(_run_live(), _run_norm())
+
+        live_end_s = live_res.telemetry.utterance_end_s or simulated_speech_s
+        live_wait_s = max(0.0, round(live_total_s - live_end_s, 2))
+        normal_wait_s = round(normal_wait_s, 2)
+
+        # Calculate real head start and speedup
+        prov_fired = live_res.telemetry.provisional_fired_s
+        head_start_s = round(live_end_s - prov_fired, 2) if prov_fired is not None else 0.0
+        speedup = round(normal_wait_s / max(0.05, live_wait_s), 1) if live_wait_s > 0 else 10.0
+
+        return CompareResponse(
+            utterance=req.utterance,
+            live=TurnResponse(answer=live_res.answer, telemetry=live_res.telemetry, thoughts=live_thoughts),
+            normal=TurnResponse(answer=norm_res.answer, telemetry=norm_res.telemetry, thoughts=norm_thoughts),
+            speech_duration_s=simulated_speech_s,
+            live_wait_s=live_wait_s,
+            normal_wait_s=normal_wait_s,
+            head_start_s=head_start_s,
+            speedup_factor=speedup,
+        )
+    except Exception as e:
+        logger.warning("Side-by-side compare failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"Comparison execution failed: {e}")
+    finally:
+        from session.store import delete_session
+        delete_session(live_session)
+        delete_session(norm_session)
+
+
+@app.websocket("/ws/compare")
+@app.websocket("/ws/dual_stream")
+async def ws_compare(ws: WebSocket):
+    """
+    Live voice comparison stream.
+    Accepts speech chunks from the user's microphone in real time and routes
+    the identical audio/text stream to both pipelines simultaneously:
+    - Lane 1 (Streaming Live RAG): Consumes partial chunks in-flight, evaluating
+      Gate G2 stability and firing speculative retrieval while speaker is talking.
+    - Lane 2 (Normal Sequential RAG): Waits until speech completely ends, then
+      begins sequential decomposition, vector search, and synthesis.
+    Both run in completely isolated sessions with query cache strictly bypassed.
+    """
+    await ws.accept()
+    session_prefix = f"cmp_voice_{int(time.time() * 1000) % 1000000}"
+    live_session = f"{session_prefix}_live"
+    norm_session = f"{session_prefix}_norm"
+
+    live_source: LiveQueueSource = LiveQueueSource()
+    live_thoughts: list[dict] = []
+    norm_thoughts: list[dict] = []
+
+    async def _send_live(ev: dict):
+        try:
+            if ev.get("type") == "thought":
+                live_thoughts.append(ev)
+            await ws.send_json({"lane": "live", **ev})
+        except Exception:
+            pass
+
+    async def _send_norm(ev: dict):
+        try:
+            if ev.get("type") == "thought":
+                norm_thoughts.append(ev)
+            await ws.send_json({"lane": "normal", **ev})
+        except Exception:
+            pass
+
+    live_engine_task: asyncio.Task | None = None
+    t_speech_start = time.time()
+    t_speech_end = time.time()
+    last_text = ""
+
+    try:
+        await ws.send_json({
+            "type": "session_init",
+            "live_session": live_session,
+            "norm_session": norm_session,
+        })
+
+        # Start Lane 1 (Streaming Live RAG) task immediately
+        live_engine_task = asyncio.create_task(
+            run_live_turn(live_session, live_source, emit_event=_send_live, live_mode=True, use_cache=False)
+        )
+
+        while True:
+            try:
+                msg = await asyncio.wait_for(ws.receive_json(), timeout=60.0)
+            except (asyncio.TimeoutError, TimeoutError):
+                await live_source.finish()
+                break
+
+            if not isinstance(msg, dict):
+                continue
+
+            mtype = msg.get("type")
+            if mtype == "chunk":
+                chunk_text = str(msg.get("text", "")).strip()
+                if chunk_text:
+                    last_text = chunk_text
+                    await live_source.push_text(last_text)
+                    # Notify normal lane that speaker is active
+                    await ws.send_json({
+                        "lane": "normal",
+                        "type": "listening",
+                        "text": "User speaking... Classic sequential RAG is idle, waiting for speech completion.",
+                    })
+            elif mtype == "end":
+                if msg.get("text"):
+                    last_text = str(msg.get("text")).strip()
+                    await live_source.push_text(last_text)
+                await live_source.finish()
+                break
+            elif mtype == "cancel":
+                if live_engine_task and not live_engine_task.done():
+                    live_engine_task.cancel()
+                await live_source.finish()
+                return
+
+        t_speech_end = time.time()
+        speech_duration_s = max(0.1, round(t_speech_end - t_speech_start, 2))
+        await ws.send_json({
+            "type": "speech_ended",
+            "duration_s": speech_duration_s,
+            "final_transcript": last_text,
+        })
+
+        # Speech is concluded! Now Lane 2 starts its sequential run on the exact same voice text
+        words = last_text.strip().split()
+        norm_source = play_utterance(last_text, words_per_chunk=len(words) or 1, ms_per_chunk=0)
+
+        async def _run_normal():
+            t0_n = time.time()
+            res = await run_live_turn(norm_session, norm_source, emit_event=_send_norm, live_mode=False, use_cache=False)
+            t_norm_wait = time.time() - t0_n
+            return res, t_norm_wait
+
+        norm_task = asyncio.create_task(_run_normal())
+
+        # Lane 1 finishes (was pre-retrieving in background during speech!)
+        live_res = await live_engine_task
+        t_live_done = time.time()
+        live_wait_s = max(0.0, round(t_live_done - t_speech_end, 2))
+
+        await ws.send_json({
+            "lane": "live",
+            "type": "done",
+            "answer": live_res.answer,
+            "wait_s": live_wait_s,
+            "telemetry": live_res.telemetry.model_dump(),
+        })
+
+        # Wait for Normal Lane to finish its post-speech sequential work
+        norm_res, norm_wait_s = await norm_task
+        normal_wait_s = round(norm_wait_s, 2)
+
+        await ws.send_json({
+            "lane": "normal",
+            "type": "done",
+            "answer": norm_res.answer,
+            "wait_s": normal_wait_s,
+            "telemetry": norm_res.telemetry.model_dump(),
+        })
+
+        prov_fired = live_res.telemetry.provisional_fired_s
+        head_start_s = round(speech_duration_s - prov_fired, 2) if prov_fired is not None else 0.0
+        speedup = round(normal_wait_s / max(0.05, live_wait_s), 1) if live_wait_s > 0 else 10.0
+
+        await ws.send_json({
+            "type": "summary",
+            "utterance": last_text,
+            "speech_duration_s": speech_duration_s,
+            "live_wait_s": live_wait_s,
+            "normal_wait_s": normal_wait_s,
+            "head_start_s": head_start_s,
+            "speedup_factor": speedup,
+        })
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.warning("ws_compare error: %s", e)
+        try:
+            await ws.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        if live_engine_task and not live_engine_task.done():
+            live_engine_task.cancel()
+        from session.store import delete_session
+        delete_session(live_session)
+        delete_session(norm_session)
+        try:
+            await ws.close()
+        except Exception:
+            pass
 
 
 _WS_SESSION_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,128}$")
@@ -455,13 +784,14 @@ async def ws_stream(ws: WebSocket):
     session_id = str(hello.get("session_id") or "")
     if not _WS_SESSION_RE.match(session_id):
         session_id = "ws_" + uuid.uuid4().hex[:12]
+    live_mode = bool(hello.get("live_mode", True))
 
     source: LiveQueueSource = LiveQueueSource()
 
     async def _send(payload: dict) -> None:
         await ws.send_json(payload)
 
-    engine_task = asyncio.create_task(run_live_turn(session_id, source, emit_event=_send))
+    engine_task = asyncio.create_task(run_live_turn(session_id, source, emit_event=_send, live_mode=live_mode))
 
     async def _reader() -> None:
         try:
@@ -469,7 +799,11 @@ async def ws_stream(ws: WebSocket):
                 try:
                     msg = await asyncio.wait_for(ws.receive_json(), timeout=_WS_IDLE_TIMEOUT_S)
                 except (asyncio.TimeoutError, TimeoutError):
-                    # Client went quiet: finish the turn with what arrived.
+                    # Client went quiet:
+                    if not source._last_text.strip():
+                        # No text received during idle timeout; cancel rather than running a phantom turn
+                        engine_task.cancel()
+                        return
                     await source.finish()
                     return
                 if not isinstance(msg, dict):
@@ -479,6 +813,14 @@ async def ws_stream(ws: WebSocket):
                     await source.push_text(str(msg.get("text", ""))[:2000])
                 elif mtype == "end":
                     await source.finish()
+                    return
+                elif mtype == "cancel":
+                    engine_task.cancel()
+                    await source.finish()
+                    try:
+                        await ws.send_json({"type": "error", "message": "Turn cancelled by user."})
+                    except Exception:
+                        pass
                     return
         except WebSocketDisconnect:
             pass

@@ -3,7 +3,7 @@ import sys
 import glob
 import re
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -282,36 +282,41 @@ def ingest_file_or_text(
         result = ingest_sections(sections, reset=False)
         result["doc_id"] = doc_id
 
-        # Persist a local copy to data/dev_corpus with doc_id namespacing
+        # Persist a local copy to data/uploads with doc_id namespacing
         try:
-            os.makedirs(corpus_dir, exist_ok=True)
+            uploads_dir = os.path.join(os.path.dirname(__file__), "../data/uploads")
+            os.makedirs(uploads_dir, exist_ok=True)
             safe_name = f"{doc_id}_{re.sub(r'[^a-zA-Z0-9_.-]', '_', filename)}"
-            with open(os.path.join(corpus_dir, safe_name), "wb") as f:
+            with open(os.path.join(uploads_dir, safe_name), "wb") as f:
                 f.write(content_bytes)
         except Exception as e:
-            logger.warning("Failed to save copy of uploaded file to dev_corpus: %s", e)
+            logger.warning("Failed to save copy of uploaded file to uploads: %s", e)
 
         return result
 
 
-def parse_corpus(corpus_dir: str):
+def parse_corpus(corpus_dir: str, allowed_docs: Optional[Set[str]] = None) -> List[Dict[str, Any]]:
     """
     Parses all supported files in the given directory.
     Supports .txt, .pdf, .docx, .pptx, .xlsx, .csv, .json, .yaml, .html, .md.
+    If allowed_docs is provided (e.g. {'Doc_01', 'Doc_02'}), only chunks belonging to those IDs are returned.
     """
     from retrieval.parsers import extract_sections
 
     chunks = []
     all_files = sorted(glob.glob(os.path.join(corpus_dir, "*.*")))
+    # Prioritize benchmark text files first so Doc_01 and Doc_02 are stable
+    txt_files = [f for f in all_files if f.lower().endswith((".txt", ".md"))]
+    other_files = [f for f in all_files if not f.lower().endswith((".txt", ".md", ".py", ".pyc"))]
+    ordered_files = txt_files + other_files
 
-    doc_idx = 1
-    for file_path in all_files:
+    seen_hashes = set()
+    used_ids = set()
+
+    for file_path in ordered_files:
         filename = os.path.basename(file_path)
         ext = os.path.splitext(filename.lower())[1]
         if ext in (".py", ".pyc"):
-            continue
-        # R7: Skip dynamically persisted upload copies (Doc_XX_*) in batch ingestion
-        if re.match(r"^Doc_\d{2,}_", filename):
             continue
         try:
             with open(file_path, "rb") as f:
@@ -319,39 +324,66 @@ def parse_corpus(corpus_dir: str):
             if not content.strip():
                 continue
 
-            doc_id = f"Doc_{doc_idx:02d}"
-            # Check if text file contains explicit Doc_XX
+            content_hash = hashlib.sha256(content).hexdigest()
+            if content_hash in seen_hashes:
+                continue
+            seen_hashes.add(content_hash)
+
+            # Assign stable doc_id
+            assigned_id = None
             if ext in (".txt", ".md"):
                 try:
                     txt = content.decode("utf-8", errors="ignore")
                     m = re.search(r"Doc_(\d+)", txt)
                     if m:
-                        doc_id = f"Doc_{int(m.group(1)):02d}"
+                        candidate = f"Doc_{int(m.group(1)):02d}"
+                        if candidate not in used_ids:
+                            assigned_id = candidate
                 except Exception:
                     pass
 
-            file_sections = extract_sections(filename, content, doc_id)
+            if not assigned_id:
+                m = re.search(r"Doc_(\d+)", filename)
+                if m:
+                    candidate = f"Doc_{int(m.group(1)):02d}"
+                    if candidate not in used_ids:
+                        assigned_id = candidate
+
+            if not assigned_id or assigned_id in used_ids:
+                idx = 1
+                while f"Doc_{idx:02d}" in used_ids:
+                    idx += 1
+                assigned_id = f"Doc_{idx:02d}"
+
+            used_ids.add(assigned_id)
+
+            if allowed_docs and assigned_id not in allowed_docs:
+                continue
+
+            file_sections = extract_sections(filename, content, assigned_id)
+            for s in file_sections:
+                s["file_hash"] = content_hash
             chunks.extend(file_sections)
-            doc_idx += 1
         except Exception as e:
             logger.warning("Failed to parse %s: %s", file_path, e)
 
     return chunks
 
 
-def ingest():
-    """Default batch ingestion entrypoint."""
+def ingest(allowed_docs: Optional[Set[str]] = None):
+    """Default batch ingestion entrypoint: indexes strictly Doc 1 and Doc 2."""
+    if allowed_docs is None:
+        allowed_docs = {"Doc_01", "Doc_02"}
     corpus_dir = os.path.join(os.path.dirname(__file__), "../data/dev_corpus")
-    print(f"Parsing corpus from {corpus_dir}...")
-    chunks = parse_corpus(corpus_dir)
+    print(f"Parsing corpus from {corpus_dir} (strictly {sorted(list(allowed_docs))})...")
+    chunks = parse_corpus(corpus_dir, allowed_docs=allowed_docs)
     print(f"Found {len(chunks)} chunks.")
 
     if not chunks:
         print("No chunks found. Exiting.")
         return
 
-    force_reindex = os.getenv("FORCE_REINDEX", "false").lower() in ("true", "1")
-    res = ingest_sections(chunks, reset=force_reindex)
+    res = ingest_sections(chunks, reset=True)
     print(f"Ingestion complete: {res['chunks_indexed']} chunks indexed in collection '{res['collection']}'.")
 
 
