@@ -277,6 +277,21 @@ Phase 3 (Streaming Controller) completed and Gate 2 cleared.
 - **Next Steps for AI/Human Teammates:**
   - Project is feature-complete, verified, tested, and fully documented for hackathon evaluation and demonstration.
 
+### [2026-10-01] Docker Hardening, Submission Links & Pre-Release Tag Verification
+- **Agent:** Antigravity
+- **Actions Taken:**
+  - **Docker & Packaging Hardening:**
+    - Fixed setuptools multi-package discovery error in `pyproject.toml` (`[tool.setuptools.packages.find]`), properly including active modules and excluding test/doc directories.
+    - Adjusted `requires-python = ">=3.10"` in `pyproject.toml` ensuring seamless installation across Python 3.10 and 3.11.
+    - Hardened `Dockerfile` to copy `requirements.txt` and `pyproject.toml` for cached dependency builds, model pre-downloading, and source installation.
+    - Verified `docker compose config` syntax.
+  - **Submission Links & Documentation Integration:**
+    - Embedded official Demo Video Google Drive link (`https://drive.google.com/drive/folders/1muvRZOVJlYRSdYLyyD0VAJe_Lz-00nf2?usp=sharing`) and Presentation Deck link (`https://drive.google.com/drive/folders/1cKpICUqJ6JxmG5sLCLcYGVM1Z0PC0RMo?usp=sharing`) in root `README.md`, subfolder `README.md`, and `docs/CHECKLIST.md`.
+    - Documented team metadata: `VIT_RAGnarok` (Vellore Institute of Technology).
+  - **Testing & Verification:**
+    - All 26 unit tests passing (`pytest tests/ -v`).
+
+
 
 
 
