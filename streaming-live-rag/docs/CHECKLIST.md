@@ -33,19 +33,12 @@ This checklist tracks engineering deliverables and official submission requireme
 ## 2. Team Administrative & Submission Tasks
 
 - [ ] **Confirm Team Registration:** Ensure college/team registration details match PRISM records.
-- [ ] **Record Demo Video (≤ 5 minutes):**
-  - Walk through the Interactive Demo Dashboard (`http://localhost:8000`).
-  - Demonstrate Side-by-Side VS Arena with live microphone voice input.
-  - Demonstrate 4-Phase Honest Thought Stream in real time.
-  - Demonstrate Scenario 1 (Early Retrieval at $t_1$).
-  - Demonstrate Scenario 2 (Multi-Intent parallel retrieval with Quota Merge).
-  - Demonstrate Scenario 3 (Chit-Chat suppression with zero DB queries).
-  - Demonstrate Scenario 4 (Multi-Turn Late Detail Refinement $1 \to 1 \to 2$).
-  - Demonstrate Scenario 5 (Presentation-Only reformat without DB queries).
-  - Host on YouTube (Unlisted) or Google Drive (link shared to "Anyone with link can view"). Test in a private/incognito window.
-- [ ] **Finalize Presentation Deck:**
-  - File name **must be exactly**: `CollegeName_TeamName_Submission_ppt` (PPT or PDF).
-  - Content: Theme ID, project title, problem statement, solution & architecture diagram, tech stack, innovation highlights, results scorecard, limitations.
+- [x] **Record Demo Video (≤ 5 minutes):**
+  - **Drive Link:** [Demo Video Folder](https://drive.google.com/drive/folders/1muvRZOVJlYRSdYLyyD0VAJe_Lz-00nf2?usp=sharing)
+  - Demonstrates Side-by-Side VS Arena, live microphone voice streaming, 4-phase honest thought stream, and sub-350ms TTFT.
+- [x] **Finalize Presentation Deck & AI Disclosure:**
+  - **Drive Link:** [Presentation Deck & AI Disclosure Folder](https://drive.google.com/drive/folders/1cKpICUqJ6JxmG5sLCLcYGVM1Z0PC0RMo?usp=sharing)
+  - Nomenclature: `VIT_RAGnarok_Submission_ppt` (PPT / PDF) covering Theme ID, Problem, Architecture, Tech Stack, Innovations, Results & Limitations, accompanied by the official AI Disclosure Statement.
 - [ ] **Tag Final Release Commit:**
   - Tag name **must be exactly**: `PRISM_GENAI_HACKATHON_Y2026`.
   - Command:

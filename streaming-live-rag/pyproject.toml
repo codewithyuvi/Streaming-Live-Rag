@@ -2,7 +2,7 @@
 name = "streaming-live-rag"
 version = "0.1.0"
 description = "Samsung PRISM GenAI Hackathon 2026-27 - Theme 4 - Streaming Live RAG"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
@@ -33,3 +33,9 @@ dev = [
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api*", "controller*", "retrieval*", "streaming*", "session*", "telemetry*"]
+exclude = ["data*", "docs*", "eval*", "logs*", "static*", "tests*"]
+
