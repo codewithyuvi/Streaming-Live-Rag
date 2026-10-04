@@ -3,7 +3,7 @@
 *A low-latency, session-aware retrieval-augmented generation pipeline with real-time speech controller, 4-phase honest thought stream, multi-intent decomposition, deterministic grounding verification, GPU hardware acceleration, and a live side-by-side VS Arena.*
 
 > 🎥 **Demo Video:** [Watch Demonstration (Google Drive)](https://drive.google.com/drive/folders/1muvRZOVJlYRSdYLyyD0VAJe_Lz-00nf2?usp=sharing)  
-> 📑 **Presentation Deck & AI Disclosure:** [View Slides & AI Disclosure (Google Drive)](https://drive.google.com/drive/folders/1cKpICUqJ6JxmG5sLCLcYGVM1Z0PC0RMo?usp=sharing)  
+> 📑 **Presentation Deck & AI Disclosure:** [View Slides & AI Disclosure (Google Drive)](https://drive.google.com/drive/folders/1cKpICUqJ6JxmG5sLCLcYGVM1Z0PC0RMo?usp=sharing) | [Local Presentation (PDF)](VIT_RAGnarok_Submission_ppt.pdf) | [AI Disclosure (PDF)](VIT_RAGnarok_AI_Disclosure.pdf)  
 > 🏷️ **Submission Release Tag:** `PRISM_GENAI_HACKATHON_Y2026` | 👥 **Team:** `VIT_RAGnarok` (Vellore Institute of Technology)
 
 ---

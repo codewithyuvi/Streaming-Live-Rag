@@ -38,13 +38,14 @@ This checklist tracks engineering deliverables and official submission requireme
   - Demonstrates Side-by-Side VS Arena, live microphone voice streaming, 4-phase honest thought stream, and sub-350ms TTFT.
 - [x] **Finalize Presentation Deck & AI Disclosure:**
   - **Drive Link:** [Presentation Deck & AI Disclosure Folder](https://drive.google.com/drive/folders/1cKpICUqJ6JxmG5sLCLcYGVM1Z0PC0RMo?usp=sharing)
-  - Nomenclature: `VIT_RAGnarok_Submission_ppt` (PPT / PDF) covering Theme ID, Problem, Architecture, Tech Stack, Innovations, Results & Limitations, accompanied by the official AI Disclosure Statement.
-- [ ] **Tag Final Release Commit:**
+  - **Local Artifacts:** [VIT_RAGnarok_Submission_ppt.pdf](VIT_RAGnarok_Submission_ppt.pdf), [VIT_RAGnarok_Submission_ppt.pptx](VIT_RAGnarok_Submission_ppt.pptx), [VIT_RAGnarok_AI_Disclosure.pdf](VIT_RAGnarok_AI_Disclosure.pdf)
+  - **Nomenclature:** `VIT_RAGnarok_Submission_ppt` (PPT / PDF) covering Theme ID, Problem, Architecture, Tech Stack, Innovations, Results & Limitations, accompanied by the official AI Disclosure Statement.
+- [x] **Tag Final Release Commit:**
   - Tag name **must be exactly**: `PRISM_GENAI_HACKATHON_Y2026`.
   - Command:
     ```bash
-    git tag PRISM_GENAI_HACKATHON_Y2026
-    git push origin PRISM_GENAI_HACKATHON_Y2026
+    git tag -f PRISM_GENAI_HACKATHON_Y2026 HEAD
+    git push origin -f PRISM_GENAI_HACKATHON_Y2026
     ```
 - [ ] **Submit Official Google Form:**
   - Exactly one submission per team.
